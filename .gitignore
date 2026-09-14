@@ -1,0 +1,27 @@
+# Build output
+bin/
+obj/
+[Rr]elease/
+[Dd]ebug/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Claude Code session state - never ours to ship
+.claude/
+
+# The built payload: the packager writes the DLL here for the release upload, and a
+# payload is a GitHub release asset, never a commit.
+HexiumDist/plugins/
+HexiumDist/*.zip
