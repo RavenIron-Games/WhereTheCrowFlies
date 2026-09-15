@@ -564,7 +564,12 @@ namespace WhereTheCrowFlies.Patches
             _timer += dt;
             if (_timer >= FlushIntervalSeconds)
             {
-                _timer = 0f;
+                // Subtract the interval instead of resetting to zero, so this
+                // clock and the full-sync clock below stop drifting apart by a
+                // frame per tick (review 2026-09-15). A long hitch resets to
+                // zero rather than firing a burst of catch-up flushes.
+                _timer -= FlushIntervalSeconds;
+                if (_timer >= FlushIntervalSeconds) _timer = 0f;
 
                 // 1. Flush Combat & Defense Batches
                 foreach (var kv in _combatAcc)
@@ -602,7 +607,13 @@ namespace WhereTheCrowFlies.Patches
             _fullSyncTimer += dt;
             if (_fullSyncTimer >= fullSyncInterval)
             {
-                _fullSyncTimer = 0f;
+                _fullSyncTimer -= fullSyncInterval;
+                if (_fullSyncTimer >= fullSyncInterval) _fullSyncTimer = 0f;
+                // Pending deltas go out BEFORE the absolute snapshot. The
+                // snapshot already contains everything accumulated so far; a
+                // delta sent after it would be added on top by the server and
+                // double count until the next snapshot (review 2026-09-15).
+                if (_statDeltas.Count > 0) FlushStatDeltas();
                 FlushStatSnapshot();
                 FlushSkillSnapshot();
             }
@@ -612,6 +623,7 @@ namespace WhereTheCrowFlies.Patches
         // independent of the 10s Tick() cadence — see Patch_PlayerOnSpawned.
         public static void FlushFullBackfill()
         {
+            if (_statDeltas.Count > 0) FlushStatDeltas(); // same ordering rule as Tick
             FlushStatSnapshot();
             FlushSkillSnapshot();
         }
@@ -700,6 +712,40 @@ namespace WhereTheCrowFlies.Patches
             if (list.Count > 0)
             {
                 TelemetrySender.SendStatSync(playerName, pos, list);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Console routing
+
+    // The server-only "ravenscall" command (TheRavensCall) cannot be typed
+    // from a client unless the client's own Terminal knows the name: an
+    // unknown command is "not a recognized command" locally and never leaves
+    // the machine. This stub registers the name flagged onlyServer +
+    // remoteCommand, so Terminal.TryRunCommand routes it through
+    // ZNet.RemoteCommand to the server, where RPC_RemoteCommand checks the
+    // admin list and TheRavensCall's real command runs (review 2026-09-15).
+    // On a listen host TheRavensCall registers the real command on this same
+    // method; Harmony order between the two is not fixed, so the stub stands
+    // down if the name is already taken rather than assuming it loses.
+    [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
+    internal static class Patch_ConsoleRouting
+    {
+        private static void Postfix()
+        {
+            try
+            {
+                if (Terminal.commands != null && Terminal.commands.ContainsKey("ravenscall")) return;
+                new Terminal.ConsoleCommand("ravenscall",
+                    "Server admin command (TheRavensCall): ravenscall season start [name] | ravenscall season end. Runs on the server; needs admin.",
+                    args => args.Context?.AddString("[WhereTheCrowFlies] ravenscall runs on the server; the output is in the server console."),
+                    onlyServer: true, remoteCommand: true);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] console routing stub failed: {ex.Message}");
             }
         }
     }
@@ -977,24 +1023,65 @@ namespace WhereTheCrowFlies.Patches
 
     #region Harmony Patches: Crafting & Repairs
 
+    // DoCrafting has five early returns that leave m_craftRecipe set and
+    // produce nothing (max quality, missing requirements, inventory full,
+    // missing DLC, upgrader resource missing), and it fires when the craft
+    // timer completes, seconds after the click, so "inventory filled while
+    // the bar ran" is ordinary play. The old Postfix counted every one of
+    // those as a craft, and sent recipe.m_amount, ignoring multi-craft and
+    // the station bonus (review 2026-09-15). Count the produced item at its
+    // target quality before and after: the difference is the real amount,
+    // and zero means nothing happened (or an upgrader failed or broke).
     [HarmonyPatch(typeof(InventoryGui), "DoCrafting")]
     internal static class Patch_Crafting
     {
-        private static void Postfix(InventoryGui __instance, Player player)
+        private sealed class CraftState
         {
+            public string SharedName;
+            public int TargetQuality;
+            public int CountBefore;
+            public bool IsUpgrade;
+        }
+
+        private static void Prefix(InventoryGui __instance, Player player, out CraftState __state)
+        {
+            __state = null;
             try
             {
                 if (!Plugin.EnableReporting.Value || player == null || player != Player.m_localPlayer) return;
-                if (__instance == null || __instance.m_craftRecipe == null) return;
+                if (__instance == null || __instance.m_craftRecipe == null || __instance.m_craftRecipe.m_item == null) return;
+                var shared = __instance.m_craftRecipe.m_item.m_itemData.m_shared;
+                bool isUpgrade = __instance.m_craftUpgradeItem != null;
+                int target = isUpgrade ? __instance.m_craftUpgradeItem.m_quality + 1 : 1;
+                __state = new CraftState
+                {
+                    SharedName = shared.m_name,
+                    TargetQuality = target,
+                    CountBefore = player.GetInventory().CountItems(shared.m_name, target),
+                    IsUpgrade = isUpgrade,
+                };
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] DoCrafting prefix failed: {ex.Message}");
+            }
+        }
+
+        private static void Postfix(InventoryGui __instance, Player player, CraftState __state)
+        {
+            try
+            {
+                if (__state == null || player == null || __instance == null || __instance.m_craftRecipe == null) return;
+                int produced = player.GetInventory().CountItems(__state.SharedName, __state.TargetQuality) - __state.CountBefore;
+                if (produced <= 0) return;
 
                 var recipe = __instance.m_craftRecipe;
                 string itemName = recipe.m_item != null ? TelemetrySender.CleanName(recipe.m_item.gameObject.name) : "Unknown";
-                byte action = __instance.m_craftUpgradeItem != null ? CraftingAction.Upgraded : CraftingAction.Crafted;
-                int quality = __instance.m_craftUpgradeItem != null ? (__instance.m_craftUpgradeItem.m_quality + 1) : 1;
-                int amount = recipe.m_amount;
+                byte action = __state.IsUpgrade ? CraftingAction.Upgraded : CraftingAction.Crafted;
+                int amount = __state.IsUpgrade ? 1 : produced;
                 string stationName = player.GetCurrentCraftingStation() != null ? TelemetrySender.CleanName(player.GetCurrentCraftingStation().gameObject.name) : "Hand";
 
-                TelemetrySender.SendCrafting(player.GetPlayerName(), itemName, player.transform.position, action, quality, amount, stationName);
+                TelemetrySender.SendCrafting(player.GetPlayerName(), itemName, player.transform.position, action, __state.TargetQuality, amount, stationName);
             }
             catch (Exception ex)
             {
@@ -1028,16 +1115,48 @@ namespace WhereTheCrowFlies.Patches
 
     #region Harmony Patches: Harvesting & Foraging
 
-    [HarmonyPatch(typeof(Pickable), "RPC_Pick")]
+    // Reported from the PICKER's own client, in Pickable.Interact, not from
+    // the zone owner's RPC_Pick. RPC_Pick runs only on the client that owns
+    // the pickable's zone, so the old prefix credited every berry another
+    // player picked in that zone to the owner, and fired again for a bush
+    // that was already picked (review 2026-09-15). Interact runs on the
+    // interacting player's client and always ends in the RPC, so the pick is
+    // attributed to the player who made it, and the server's self-report
+    // binding accepts it. The amount is the formula RPC_Pick uses, minus the
+    // skill bonus yield: Interact rolls it here on the picker and passes it
+    // to RPC_Pick as a local, which no postfix can read (decompile
+    // 71368-71381). A non-owner's m_picked only flips when the owner's
+    // RPC_SetPicked reply lands, and Player.Update re-runs Interact every
+    // 0.2 s while Use is held, so a per-instance two-second debounce keeps
+    // one pick from being reported two to four times. Two seconds drops no
+    // real event: a pickable respawns after minutes, or is destroyed.
+    [HarmonyPatch(typeof(Pickable), nameof(Pickable.Interact))]
     internal static class Patch_Pickable
     {
-        private static void Prefix(Pickable __instance, long sender, int bonus)
+        private static readonly Dictionary<int, float> _lastPickReport = new Dictionary<int, float>();
+        private const float PickDebounceSeconds = 2f;
+
+        private static void Prefix(Pickable __instance, out bool __state)
+        {
+            // "Already picked" is read BEFORE the call: when the picker is
+            // also the owner, RPC_Pick runs synchronously inside Interact and
+            // flips m_picked before any Postfix could look at it.
+            __state = __instance != null && __instance.m_picked;
+        }
+
+        private static void Postfix(Pickable __instance, Humanoid character, bool __state)
         {
             try
             {
-                if (!Plugin.EnableReporting.Value || __instance == null) return;
-                var player = Player.m_localPlayer;
-                if (player == null) return;
+                if (!Plugin.EnableReporting.Value || __instance == null || __state) return;
+                if (!(character is Player player) || player != Player.m_localPlayer) return;
+                // Mirror Interact's own early returns, which happen before the RPC.
+                if (__instance.m_nview == null || !__instance.m_nview.IsValid() || __instance.m_enabled == 0) return;
+                if (__instance.m_tarPreventsPicking)
+                {
+                    var floating = __instance.GetComponent<Floating>();
+                    if (floating != null && floating.IsInTar()) return;
+                }
 
                 string itemName = __instance.GetHoverName();
                 if (string.IsNullOrEmpty(itemName) && __instance.m_itemPrefab != null)
@@ -1047,7 +1166,18 @@ namespace WhereTheCrowFlies.Patches
                 if (string.IsNullOrEmpty(itemName)) itemName = "Pickable";
 
                 byte sourceType = __instance.m_harvestable ? HarvestSourceType.Crop : HarvestSourceType.Foraged;
-                int amount = Mathf.Max(1, __instance.m_amount + bonus);
+                int amount = (__instance.m_dontScale || Game.instance == null || __instance.m_itemPrefab == null)
+                    ? __instance.m_amount
+                    : Mathf.Max(__instance.m_minAmountScaled, Game.instance.ScaleDrops(__instance.m_itemPrefab, __instance.m_amount));
+                amount = Mathf.Max(1, amount);
+
+                // Debounce per pickable instance (see the class comment).
+                int key = __instance.GetInstanceID();
+                float now = Time.realtimeSinceStartup;
+                if (_lastPickReport.TryGetValue(key, out float last) && now - last < PickDebounceSeconds) return;
+                foreach (var k in new List<int>(_lastPickReport.Keys))
+                    if (now - _lastPickReport[k] > PickDebounceSeconds) _lastPickReport.Remove(k);
+                _lastPickReport[key] = now;
 
                 TelemetrySender.SendHarvesting(player.GetPlayerName(), itemName, __instance.transform.position, sourceType, amount);
             }

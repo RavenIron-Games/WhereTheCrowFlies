@@ -6,7 +6,7 @@
 [![Deployment](https://img.shields.io/badge/Install-Client_Only-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Publisher](https://img.shields.io/badge/RavenIron-Release-8B6F1F.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.2-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.3-lightgrey.svg)]()
 
 **RavenIron's client companion mod for The Raven's Call: effortlessly witnesses and relays player combat, defense, kills, deaths, crafting, building, foraging, consumption, rituals, and 100% of vanilla stats to the hall's ledger.**
 
@@ -32,8 +32,8 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 - **Harvesting, Foraging & Agriculture**: Relays berry/mushroom foraging, farm crop harvests, beehives, and sap extraction.
 - **Survival & Consumables**: Tracks food items eaten, health/stamina/eitr gains, and potion/mead consumption.
 - **World Rituals & Exploration**: Captures boss altar offerings/summons, portal traversals with tags, and Forsaken power activations.
-- **100% Vanilla PlayerStat Delta Sync**: Intercepts all 105 vanilla `PlayerStatType` counters (distances traveled, jumps, arrows fired, skeleton summons, time in base, sleep, tree chops, mining hits, etc.) and synchronizes deltas to the server.
-- **Full Stat & Skill Backfill**: Broadcasts a full absolute snapshot of all 105 stats plus every raised `Skills.SkillType` (level and progress) on spawn and on a configurable interval (default 5 minutes) — so pre-existing totals a player already earned show up immediately, not just future deltas.
+- **100% Vanilla PlayerStat Delta Sync**: Intercepts every vanilla `PlayerStatType` counter (~205 on Valheim 1.0) (distances traveled, jumps, arrows fired, skeleton summons, time in base, sleep, tree chops, mining hits, etc.) and synchronizes deltas to the server.
+- **Full Stat & Skill Backfill**: Broadcasts a full absolute snapshot of all ~205 stats plus every raised `Skills.SkillType` (level and progress) on spawn and on a configurable interval (default 5 minutes) — so pre-existing totals a player already earned show up immediately, not just future deltas.
 - **Zero In-Game Overhead**: Runs completely in the background without UI or performance penalty.
 - **Safe Everywhere**: Connects safely to vanilla servers or servers without `TheRavensCall` with silent no-op dispatch.
 
@@ -42,7 +42,7 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 ## 📦 Installation
 
 1. Install **BepInEx for Valheim**.
-2. Download and extract **`WhereTheCrowFlies-v1.1.2.zip`**.
+2. Download and extract **`WhereTheCrowFlies-v1.1.3.zip`**.
 3. Place `WhereTheCrowFlies.dll` into your `Valheim/BepInEx/plugins/` directory.
 
 ---

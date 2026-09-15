@@ -36,7 +36,7 @@ In Valheim's multiplayer networking model, the dedicated server acts primarily a
 ## 2. Wire Protocol Specification
 
 WhereTheCrowFlies v1.1.0 broadcasts on two routed RPC channels:
-1. **`RavensCall_EventReport_V2` (Primary)**: Full 360° telemetry payload containing rich context (stars, biomes, weapons, stations, parries, 105 vanilla stats, skills).
+1. **`RavensCall_EventReport_V2` (Primary)**: Full 360° telemetry payload containing rich context (stars, biomes, weapons, stations, parries, every vanilla stat (~205 on Valheim 1.0, 105 before), skills).
 2. **`RavensCall_CombatReport_V1` (Legacy Fallback)**: Dual-transmitted on basic combat events for 100% backward compatibility with legacy servers.
 
 ---
@@ -212,7 +212,7 @@ Emitted for world rituals, portal traversal, and power activations.
 ---
 
 #### Event Type 10: `StatSync` (100% Vanilla PlayerStat Delta Sync)
-Flushed every 10 seconds containing accumulated deltas for all 105 vanilla `PlayerStatType` counters.
+Flushed every 10 seconds containing accumulated deltas for every vanilla `PlayerStatType` counter (~205 on Valheim 1.0; 105 before 1.0). The count is read off the wire, never assumed.
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|
@@ -242,7 +242,7 @@ minutes (300s)**, configurable in the BepInEx config, floor-clamped to 10s — *
 once immediately on player spawn/join. Deliberately decoupled from
 `StatSync`'s 10-second combat/damage-batch cadence: a full snapshot is
 idempotent and not latency-sensitive the way a damage batch is, so it doesn't
-need to pay that cadence too (105 stats + skills every 10s is needless
+need to pay that cadence too (~205 stats + skills every 10s is needless
 network/disk chatter for data that mostly changes far slower than that; the
 on-spawn send already makes backfill effectively instant regardless of this
 interval). Same wire shape as `StatSync`, but every value is the
@@ -260,7 +260,7 @@ player's pre-existing data with no separate migration step needed.
 | 2 | `eventType` | `byte` | `11` (`EventType.StatSnapshot`) |
 | 3 | `playerName` | `string` | Player name |
 | 4 | `position` | `Vector3` | Player position at flush |
-| 5 | `statCount` | `int` | Number of stat pairs in this batch (`N`); currently always `105` |
+| 5 | `statCount` | `int` | Number of stat pairs in this batch (`N`). Read it off the wire: it is the live `PlayerStatType` enum length, ~205 on Valheim 1.0 (105 before 1.0); the receiver caps at 1024 (`MaxStatPairs`) |
 | 6.. `2*N+5` | `statId`, `value`| `short`, `float` | Repeated `N` times: `(short)PlayerStatType` and its current **absolute** value |
 
 ---
@@ -572,7 +572,7 @@ private static void HandleWorldEvent(long sender, ZPackage pkg)
 }
 ```
 
-#### Event 10: `StatSync` (105 Vanilla PlayerStatType Synchronization)
+#### Event 10: `StatSync` (Vanilla PlayerStatType Synchronization, ~205 counters on 1.0)
 ```csharp
 private static void HandleStatSync(long sender, ZPackage pkg)
 {
@@ -643,7 +643,7 @@ private static void HandleSkillSnapshot(long sender, ZPackage pkg)
 
 ## 4. Complete Vanilla `PlayerStatType` Reference Mapping
 
-WhereTheCrowFlies intercepts and synchronizes all 105 vanilla `PlayerStatType` enum values in `EventType.StatSync`:
+WhereTheCrowFlies intercepts and synchronizes every vanilla `PlayerStatType` enum value (~205 on Valheim 1.0, 105 before; the sender emits only the counters that changed since the last flush and the receiver reads the count off the wire; only the StatSnapshot backfill covers all ~205) in `EventType.StatSync`:
 
 | ID | Enum Name | Description |
 |---|---|---|
