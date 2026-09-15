@@ -2,6 +2,15 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
+## [1.1.3] - 2026-09-15
+
+### Fixed
+- **Harvests were credited to the zone owner, not the picker.** The pickable hook was a prefix on `Pickable.RPC_Pick`, which runs only on the client that owns the pickable's zone, so every berry another player picked in that zone was reported under the owner's name, and a second player picking an already-picked bush produced a phantom harvest. The hook is now a postfix on `Pickable.Interact`, which runs on the picking player's own client, and it skips a pickable that was already picked, plus any repeat of the same pickable within two seconds, because a non-owner's picked flag only updates when the owner's reply lands and holding Use re-runs the interaction every 0.2 s. The amount uses the same drop-scaling formula the owner uses; the rare skill-bonus yield is rolled inside the interaction on the picker's own client into a local a postfix cannot read, so it is not counted (the owner adds whatever value the picker sent, unvalidated).
+- **Failed crafts were counted, multi-crafts were undercounted.** `InventoryGui.DoCrafting` returns early (max quality, missing requirements, inventory full, missing DLC, upgrader resource missing) with the recipe still selected, and it fires when the craft bar completes, so "inventory filled while the bar ran" is ordinary play; the old postfix reported all of those as crafts and sent the recipe amount, ignoring multi-craft and the station bonus. The item is now counted at its target quality before and after: zero difference means nothing was made, and the difference is the real amount. An upgrader that fails or breaks the item no longer reports an upgrade.
+- **Absolute stats double counted every full-sync cycle.** The full snapshot never cleared the pending delta window, and both timers reset to zero instead of subtracting their interval, so they drifted and the snapshot landed inside a delta window; the next delta flush was then added on top of the snapshot on the server. Pending deltas now go out before every snapshot (the spawn backfill included), and both clocks subtract their interval.
+- **`ravenscall season start | end` can now be typed from a client.** A routing stub registers the name flagged server-only and remote, so the game sends it to the server, which checks the admin list and runs TheRavensCall's real command (any TheRavensCall that registers the command, confirmed back to 1.2.2; the server-side flags added in 1.2.4 do not gate a routed command). Non-admins get "You are not admin" from the server.
+- **Docs said 105 vanilla stats.** Valheim 1.0 has about 205; the handoff and README now say so, and that the count is read off the wire.
+
 ## [1.1.2] - 2026-09-15
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "name": "WhereTheCrowFlies",
-  "version_number": "1.1.2",
+  "version_number": "1.1.3",
   "website_url": "https://ravenirongames.rglmobile1.workers.dev/",
   "description": "Client companion mod for TheRavensCall. Witnesses and reports combat events, kills, deaths, damage, blocks, parries, fishing, crafting, building, foraging, rituals, and player stats to servers running TheRavensCall.",
   "dependencies": [
