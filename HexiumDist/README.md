@@ -6,7 +6,7 @@
 [![Deployment](https://img.shields.io/badge/Install-Client_Only-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Publisher](https://img.shields.io/badge/RavenIron-Release-8B6F1F.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.1-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.2-lightgrey.svg)]()
 
 **RavenIron's client companion mod for The Raven's Call: effortlessly witnesses and relays player combat, defense, kills, deaths, crafting, building, foraging, consumption, rituals, and 100% of vanilla stats to the hall's ledger.**
 
@@ -42,7 +42,7 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 ## 📦 Installation
 
 1. Install **BepInEx for Valheim**.
-2. Download and extract **`WhereTheCrowFlies-v1.1.1.zip`**.
+2. Download and extract **`WhereTheCrowFlies-v1.1.2.zip`**.
 3. Place `WhereTheCrowFlies.dll` into your `Valheim/BepInEx/plugins/` directory.
 
 ---
