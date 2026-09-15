@@ -708,6 +708,12 @@ namespace WhereTheCrowFlies.Patches
 
     #region Harmony Patches: Combat & Deaths
 
+    // Character.OnDeath is virtual and Player overrides it WITHOUT calling
+    // base (Player.OnDeath in the 1.0.12 decompile), so a patch on
+    // Character.OnDeath only ever runs for creatures. The player branch that
+    // used to live in this Prefix never fired once: no player death was ever
+    // reported to the server (review 2026-09-15). Player deaths now have
+    // their own target, Patch_PlayerDeath below.
     [HarmonyPatch(typeof(Character), "OnDeath")]
     internal static class Patch_CharacterDeath
     {
@@ -717,20 +723,12 @@ namespace WhereTheCrowFlies.Patches
             {
                 if (!Plugin.EnableReporting.Value) return;
                 if (__instance == null || !__instance.IsOwner()) return;
+                if (__instance is Player) return; // Patch_PlayerDeath (unreachable here anyway, see above)
 
                 Vector3 pos = __instance.transform.position;
                 string biome = TelemetrySender.GetBiomeName(pos);
 
-                // Case 1: Player Died
-                if (__instance is Player victim)
-                {
-                    string killerPlayer = "";
-                    string cause = ComputeDeathCause(victim, out killerPlayer);
-                    TelemetrySender.SendDeath(victim.GetPlayerName(), cause, pos, killerPlayer, biome);
-                    return;
-                }
-
-                // Case 2: Creature Died
+                // Creature Died
                 var hit = __instance.m_lastHit;
                 var attacker = hit?.GetAttacker() as Player;
                 if (attacker == null) return; // Unattributed kill dropped
@@ -750,7 +748,7 @@ namespace WhereTheCrowFlies.Patches
             }
         }
 
-        private static string ComputeDeathCause(Player victim, out string killerPlayer)
+        internal static string ComputeDeathCause(Player victim, out string killerPlayer)
         {
             killerPlayer = "";
             try
@@ -785,6 +783,31 @@ namespace WhereTheCrowFlies.Patches
             catch
             {
                 return "unknown causes";
+            }
+        }
+    }
+
+    // The player half of the death report. Player.OnDeath is the method that
+    // actually runs when a player dies; it returns early on every client but
+    // the owner's, so the victim's own client is the only reporter.
+    [HarmonyPatch(typeof(Player), nameof(Player.OnDeath))]
+    internal static class Patch_PlayerDeath
+    {
+        private static void Prefix(Player __instance)
+        {
+            try
+            {
+                if (!Plugin.EnableReporting.Value) return;
+                if (__instance == null || !__instance.IsOwner()) return;
+
+                Vector3 pos = __instance.transform.position;
+                string biome = TelemetrySender.GetBiomeName(pos);
+                string cause = Patch_CharacterDeath.ComputeDeathCause(__instance, out string killerPlayer);
+                TelemetrySender.SendDeath(__instance.GetPlayerName(), cause, pos, killerPlayer, biome);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] Player.OnDeath report failed: {ex.Message}");
             }
         }
     }

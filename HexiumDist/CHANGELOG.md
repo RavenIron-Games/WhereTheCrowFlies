@@ -2,6 +2,11 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
+## [1.1.2] - 2026-09-15
+
+### Fixed
+- **Player deaths were never reported.** The death hook was a Harmony patch on `Character.OnDeath`, but `Player.OnDeath` is a full override that never calls base, so the patch only ever ran for creatures and `SendDeath` was dead code from the first release. Death narratives, `death_history`, PvP killer attribution and the Discord death post have all been silent on every server. Player deaths now have their own `Player.OnDeath` patch, which runs on the victim's own client only (the method itself returns early for every non-owner). Creature kills were never affected. No wire change: the V1 type-2 death packet is the one every TheRavensCall since 1.1.0 already credits; the V2 `Death` packet is additionally understood from TheRavensCall 1.2.0, which first registered the V2 receiver. **Pairs with any TheRavensCall 1.1.0 or newer**; 1.2.3 additionally binds every self-report to the sending peer, which a 1.1.2 client passes unchanged.
+
 ## [1.1.1] - 2026-09-10
 
 ### Fixed
