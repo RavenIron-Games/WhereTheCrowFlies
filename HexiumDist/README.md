@@ -24,12 +24,12 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 
 ## ⚙️ Features
 
-- **Full-Coverage Kill & Death Tracking**: Reports creature kills with star level, boss status, tamed flag, weapon damage type, biome, and coordinates. Reports player deaths with 15+ rich computed causes (bosses, monsters, PvP opponents, drowning, falls, burning, poison, smoke, tree crush, falling stalactites).
+- **Full-Coverage Kill & Death Tracking**: Reports creature kills with star level, boss status, tamed flag, weapon damage type, biome, and coordinates. Reports player deaths with 15+ rich computed causes (bosses, monsters, PvP opponents, drowning, falls, burning, freezing, poison, spirit and lightning damage).
 - **Combat & Defense Telemetry**: Segregates PvE vs PvP damage dealt/taken, tracks hit counts, shields/weapon blocks, perfect timed parries, and total mitigated damage.
 - **Smart 10-Second Batching**: Aggregates continuous high-frequency telemetry (damage, defense, stat deltas) into compact 10-second batches, eliminating network congestion during massive raids.
 - **Crafting, Upgrading & Repairs**: Captures crafted items, quality upgrades, quantities, and crafting station origins.
 - **Building & Demolitions**: Records piece placements and structure demolitions with piece categories and coordinates.
-- **Harvesting, Foraging & Agriculture**: Relays berry/mushroom foraging, farm crop harvests, beehives, and sap extraction.
+- **Harvesting, Foraging & Agriculture**: Relays berry/mushroom foraging and farm crop harvests.
 - **Survival & Consumables**: Tracks food items eaten, health/stamina/eitr gains, and potion/mead consumption.
 - **World Rituals & Exploration**: Captures boss altar offerings/summons, portal traversals with tags, and Forsaken power activations.
 - **100% Vanilla PlayerStat Delta Sync**: Intercepts every vanilla `PlayerStatType` counter (~205 on Valheim 1.0) (distances traveled, jumps, arrows fired, skeleton summons, time in base, sleep, tree chops, mining hits, etc.) and synchronizes deltas to the server.
