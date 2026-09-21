@@ -65,3 +65,16 @@ EnableReporting = true
 ## 🛡️ Server Admin Note
 
 If your server uses **AzuAntiCheat** or a client mod whitelist, add `WhereTheCrowFlies.dll` to your server's allowed plugins list.
+
+---
+
+## 💜 Support Raven Iron
+
+Every Raven Iron mod is free, and stays free — all of it, always. Nothing is held
+back for patrons, and nothing ever will be.
+
+If you'd like to help cover server hosting and test hardware:
+
+- **Patreon** — <https://www.patreon.com/cw/RavenIronGames>
+- **Discord** — <https://discord.gg/AGKDEurAVa> — a channel per mod, and where the
+  testing happens
