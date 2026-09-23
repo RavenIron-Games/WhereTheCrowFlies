@@ -59,6 +59,11 @@ A configuration file is generated at `BepInEx/config/com.raveniron.wherethecrowf
 # Default value: true
 EnableReporting = true
 
+## How often (in seconds) to broadcast a full absolute snapshot of all vanilla player stats and skills (StatSnapshot/SkillSnapshot). These are idempotent full-state resyncs, not time-sensitive deltas, so this can be turned up if 10-second combat/damage batching feels like enough network chatter on its own — a full snapshot also always fires immediately on spawn regardless of this setting.
+# Setting type: Single
+# Default value: 300
+FullSyncIntervalSeconds = 300
+
 ## Key that opens the title panel (the same panel the /titles command opens). None = command only. Read through the game's own input layer (ZInput), so it works with Valheim 1.0's input system.
 # Setting type: KeyCode
 # Default value: None

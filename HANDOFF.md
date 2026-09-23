@@ -318,7 +318,8 @@ same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.i
 request and gets no reply within 5 seconds sees a one-time local hint instead ("No answer from the server — it needs
 TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.") — this mod does not retry the request. The handler
 accepts the packet only from the server peer's uid; it never does anything but print the text and, since 1.2.0,
-hand the parsed reply to the title panel (below) so it stays fresh with no second round trip.
+hand the parsed list to the `title` command's tab completion and to the title panel (below), so both stay fresh with
+no second round trip.
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|

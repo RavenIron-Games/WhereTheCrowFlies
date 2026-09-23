@@ -51,6 +51,28 @@ namespace WhereTheCrowFlies.Patches
 
         public static bool IsOpen => _open;
 
+        // A KeyCode the game's key map cannot name resolves to Key.None inside
+        // ZInput.TryGetKeyStateLowLevel, and the input system's Keyboard
+        // indexer throws on that (decomp/ZInput.cs:2152-2190, 2802-2820), so
+        // a config typo would otherwise log from Tick's catch every frame.
+        // Remember the offending key and stop polling it until the config
+        // changes; /titles still opens the panel (review 2026-09-22).
+        private static KeyCode _unreadableKey = KeyCode.None;
+
+        private static bool PollKey(KeyCode key)
+        {
+            try
+            {
+                return ZInput.GetKeyDown(key, false);
+            }
+            catch (Exception ex)
+            {
+                _unreadableKey = key;
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] TitlePanelKey '{key}' cannot be read by the game's input layer ({ex.GetType().Name}); the key is ignored until the config changes. /titles still opens the panel.");
+                return false;
+            }
+        }
+
         public static void Open(Terminal context)
         {
             _context = context;
@@ -81,7 +103,7 @@ namespace WhereTheCrowFlies.Patches
             try
             {
                 KeyCode key = Plugin.TitlePanelKey.Value;
-                if (key != KeyCode.None && ZInput.GetKeyDown(key, false))
+                if (key != KeyCode.None && key != _unreadableKey && PollKey(key))
                 {
                     if (!_open)
                     {
@@ -92,8 +114,13 @@ namespace WhereTheCrowFlies.Patches
                         // the keystroke from them.
                         if (Player.m_localPlayer != null && Player.m_localPlayer.TakeInput()) Open(null);
                     }
-                    else
+                    else if (!Console.IsVisible() && (Chat.instance == null || !Chat.instance.HasFocus()))
                     {
+                        // The open path above honoured the game's gate; the
+                        // close path cannot (the gate is ours while the panel
+                        // is up), so cover the two text boxes that can still
+                        // take focus over it — a key letter typed into the F5
+                        // console must not close the panel (review 2026-09-22).
                         Close("key");
                     }
                     return;
@@ -115,7 +142,8 @@ namespace WhereTheCrowFlies.Patches
         // Called from TelemetryTicker.OnGUI (Plugin.cs), the mod's one OnGUI
         // (ValkyriesCargo Core/CargoTick.cs's "one OnGUI" pattern), itself
         // wrapped there in a 3-throw-capped try/catch; this method guards
-        // itself too, matching every other public entry point in this file.
+        // itself too, like Tick, so one bad frame closes the panel with one
+        // warning instead of counting against that cap.
         public static void Draw()
         {
             if (!_open) return;
@@ -130,6 +158,11 @@ namespace WhereTheCrowFlies.Patches
                     _rect = new Rect(Mathf.Round((Screen.width - w) * 0.5f), Mathf.Round((Screen.height - h) * 0.5f), w, h);
                     _rectInitialised = true;
                 }
+
+                // Keep the window on screen after a drag or a resolution
+                // change; the rect is only centred once per process.
+                _rect.x = Mathf.Clamp(_rect.x, 0f, Mathf.Max(0f, Screen.width - _rect.width));
+                _rect.y = Mathf.Clamp(_rect.y, 0f, Mathf.Max(0f, Screen.height - _rect.height));
 
                 _rect = GUI.Window(WindowId, _rect, DrawWindow, GUIContent.none, GUIStyle.none);
             }
