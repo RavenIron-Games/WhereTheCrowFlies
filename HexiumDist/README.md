@@ -34,7 +34,7 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 - **World Rituals & Exploration**: Captures boss altar offerings/summons, portal traversals with tags, and Forsaken power activations.
 - **100% Vanilla PlayerStat Delta Sync**: Intercepts every vanilla `PlayerStatType` counter (~205 on Valheim 1.0) (distances traveled, jumps, arrows fired, skeleton summons, time in base, sleep, tree chops, mining hits, etc.) and synchronizes deltas to the server.
 - **Full Stat & Skill Backfill**: Broadcasts a full absolute snapshot of all ~205 stats plus every raised `Skills.SkillType` (level and progress) on spawn and on a configurable interval (default 5 minutes) — so pre-existing totals a player already earned show up immediately, not just future deltas.
-- **Zero In-Game Overhead**: Runs completely in the background without UI or performance penalty.
+- **Out Of The Way**: No HUD changes and no performance penalty during normal play — the only interface is the optional title panel you open yourself with `/titles`.
 - **Safe Everywhere**: Connects safely to vanilla servers or servers without `TheRavensCall` with silent no-op dispatch.
 
 ---
@@ -76,7 +76,9 @@ to do it:
 - **The title panel**: `/titles` (chat) or `titles` (F5 console) opens a small window listing everything you've
   earned. Click one to set it, "No title" to clear it, Esc or Close to leave. It asks the server on open and
   refreshes after every click, so it always shows the true state. You can also open it with a key of your own
-  choosing — set `TitlePanelKey` in the config above (`None` by default, command only).
+  choosing — set `TitlePanelKey` in the config above (`None` by default, command only). While it's open your
+  character holds still — movement, attacks, the map and chat are paused, the same way the game's own sign-text
+  dialog pauses them — so close it (Esc) before a fight.
 - **The `title` command**, with no window: `/title` (list what you've earned), `/title Wolf Hunter` (set —
   multi-word titles work), `/title clear` (shows no title, and stays that way: titles you earn later are listed,
   not shown, until you pick one). F5 console: same commands without the leading `/`.

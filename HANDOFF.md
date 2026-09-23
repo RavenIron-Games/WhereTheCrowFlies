@@ -292,8 +292,9 @@ Dodge=108, Ride=110`.
 ---
 
 #### Event Type 13: `TitleRequest` (Title Picker)
-Sent by the player's own `/title` (chat) or `title` (F5 console) command — see the README's "Picking your title"
-section. Not tied to any Harmony hook; the player triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
+Sent by the player's own `/title` (chat) or `title` (F5 console) command, and by the title panel (§2.3a) — on
+open (op 1) and on every click (ops 2/3) — see the README's "Picking your title" section. Not tied to any Harmony
+hook; the player (or their click on the panel) triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
 answer (see §2.3 `RavensCall_TitleReply_V1` below); an older server drops it like any other unknown event type
 (one "unknown eventType 13" log line, only with `LogCombatReports` on).
 

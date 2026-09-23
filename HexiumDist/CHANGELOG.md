@@ -22,7 +22,9 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **The title panel (`/titles` chat, `titles` F5 console, or the new `TitlePanelKey` config)**: a small window, on
   the family's shared gilt-frame theme (vendored from ValkyriesCargo, MIT, by Wubarrk), listing every title
   you've earned as a button — click one to set it, "No title" to clear it, Esc or Close to leave. It asks the
-  server on open and refreshes after every click over the same wire the `title` command uses.
+  server on open and refreshes after every click over the same wire the `title` command uses. While it's open
+  your character holds still — movement, attacks, the map and chat are paused, the same way the game's own
+  sign-text dialog pauses them.
 - **`ravenscall title <player> [<title>|clear]`**: the existing admin routing stub's description now mentions the
   matching admin subcommand TheRavensCall 1.7.0 adds — no wire change on this mod's side, the stub only ever routes
   the raw command text to the server.

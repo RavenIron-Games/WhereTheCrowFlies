@@ -55,7 +55,7 @@ namespace WhereTheCrowFlies.Patches
         {
             _context = context;
             _status = "Asking the server…";
-            _haveList = false; // keep the previous list on screen until the reply lands
+            _haveList = false; // clear the list until the reply lands; _titles is kept only so a failed refresh can restore it
             _open = true;
             // TitlePicker.Send prints (and, since _open is already true here,
             // also echoes into this panel via OnLocal) its own "not
@@ -81,7 +81,7 @@ namespace WhereTheCrowFlies.Patches
             try
             {
                 KeyCode key = Plugin.TitlePanelKey.Value;
-                if (key != KeyCode.None && ZInput.GetKeyDown(key))
+                if (key != KeyCode.None && ZInput.GetKeyDown(key, false))
                 {
                     if (!_open)
                     {
@@ -161,8 +161,7 @@ namespace WhereTheCrowFlies.Patches
                     string label = isActive ? title + " ✓" : title;
                     if (GUILayout.Button(label, isActive ? GiltFrameTheme.Primary : GiltFrameTheme.Button) && !isActive)
                     {
-                        TitlePicker.Send(TitleOp.Set, title, _context);
-                        _status = "Asking the server…";
+                        if (TitlePicker.Send(TitleOp.Set, title, _context)) _status = "Asking the server…";
                     }
                 }
                 GUILayout.EndScrollView();
@@ -171,8 +170,7 @@ namespace WhereTheCrowFlies.Patches
                 GUI.enabled = _active != "";
                 if (GUILayout.Button("No title", GiltFrameTheme.Button))
                 {
-                    TitlePicker.Send(TitleOp.Clear, "", _context);
-                    _status = "Asking the server…";
+                    if (TitlePicker.Send(TitleOp.Clear, "", _context)) _status = "Asking the server…";
                 }
                 GUI.enabled = true;
             }
@@ -202,9 +200,16 @@ namespace WhereTheCrowFlies.Patches
         public static void OnReply(byte kind, string text, List<string> titles, string active)
         {
             _status = text;
-            _titles = titles;
-            _active = active;
-            _haveList = true;
+            // A listless reply (the tolerant fallback in RPC_OnTitleReply)
+            // passes titles == null here; leave the existing list and active
+            // title alone rather than asserting an empty one, the same rule
+            // the tab-completion cache already gets.
+            if (titles != null)
+            {
+                _titles = titles;
+                _active = active ?? "";
+                _haveList = true;
+            }
         }
 
         // A local-only line (not connected, or the 5-second no-answer hint)

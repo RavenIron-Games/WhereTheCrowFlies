@@ -843,7 +843,18 @@ namespace WhereTheCrowFlies.Patches
                     {
                         new Terminal.ConsoleCommand("titles",
                             "Open the title panel (TheRavensCall 1.7.0+): pick which earned title the server shows with your name.",
-                            args => TitlePanel.Open(args.Context));
+                            args =>
+                            {
+                                try
+                                {
+                                    TitlePanel.Open(args.Context);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Plugin.Log?.LogWarning($"[WhereTheCrowFlies] titles command failed: {ex.Message}");
+                                    TitlePanel.Close("error");
+                                }
+                            });
                         _titlesRegistered = true;
                     }
                 }
@@ -975,17 +986,27 @@ namespace WhereTheCrowFlies.Patches
                 // so a peer that hand-crafts the whole RoutedRPCData can still
                 // claim the server's id; all that buys is one printed line under
                 // this prefix — the same reach as a chat message — because this
-                // handler never does anything but print.
+                // handler only prints the line and repaints the player's own title
+                // panel / tab-completion list — it never writes game state or sends
+                // anything back.
                 long serverPeer = (ZNet.instance != null && !ZNet.instance.IsServer())
                     ? (ZNet.instance.GetServerPeer()?.m_uid ?? 0L)
                     : 0L;
                 if (serverPeer == 0L || sender != serverPeer) return;
 
                 _pendingSince = -1f; // any reply — even one we fail to parse below — cancels the pending timer
-                if (pkg == null || pkg.Size() == 0) return;
+                if (pkg == null || pkg.Size() == 0)
+                {
+                    if (TitlePanel.IsOpen) TitlePanel.OnLocal("The server answered, but its reply could not be read.");
+                    return;
+                }
 
                 int schemaVersion = pkg.ReadInt();
-                if (schemaVersion != 1) return;
+                if (schemaVersion != 1)
+                {
+                    if (TitlePanel.IsOpen) TitlePanel.OnLocal("The server answered, but its reply could not be read.");
+                    return;
+                }
 
                 byte kind = pkg.ReadByte(); // 1 = ok/informational, 2 = refused — both print the same way
                 string text = pkg.ReadString();
@@ -1013,11 +1034,12 @@ namespace WhereTheCrowFlies.Patches
                 // tolerant fallback above) leaves the existing cache alone
                 // rather than clearing it.
                 if (titles != null) _tabOptions = titles;
-                TitlePanel.OnReply(kind, text, titles ?? new List<string>(), active ?? "");
+                TitlePanel.OnReply(kind, text, titles, active);
             }
             catch (Exception ex)
             {
                 Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title reply handling failed: {ex.Message}");
+                if (TitlePanel.IsOpen) TitlePanel.OnLocal("The server answered, but its reply could not be read.");
             }
         }
 
