@@ -2,7 +2,7 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
-## [1.2.0] - 2026-09-22
+## [1.2.0] - 2026-09-23
 
 ### Added
 - **`/title` command (chat) and `title` command (F5 console)**: pick which of your earned titles the server shows
