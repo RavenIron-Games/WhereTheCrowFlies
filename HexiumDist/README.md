@@ -93,6 +93,9 @@ the panel) whatever TheRavensCall answers. Against an older TheRavensCall, a ser
 turned off, or no TheRavensCall at all, nothing answers and you'll see a one-time hint after a few seconds that
 names both possible causes — everything else in this mod keeps working normally.
 
+**Vendored, and not ours:** the panel's gilt frame is Wubarrk's VikingOS shared source (`Libs/SharedUI/GiltFrameTheme.cs`,
+MIT), compiled in unchanged.
+
 ---
 
 ## 🛡️ Server Admin Note
