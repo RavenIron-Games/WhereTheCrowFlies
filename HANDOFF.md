@@ -45,14 +45,14 @@ WhereTheCrowFlies v1.1.0 broadcasts on two routed RPC channels:
 
 All V2 packets begin with a 5-byte header:
 1. `schemaVersion` (`int` / 4 bytes): Always `2`.
-2. `eventType` (`byte` / 1 byte): Enum value `1` to `12`.
+2. `eventType` (`byte` / 1 byte): Enum value `1` to `13`.
 
 ```
 +-------------------+------------------+-----------------------------------------------+
 | Field Name        | Type             | Description / Value Range                     |
 +-------------------+------------------+-----------------------------------------------+
 | schemaVersion     | int              | 2                                             |
-| eventType         | byte             | 1..12 (Event discriminator)                   |
+| eventType         | byte             | 1..13 (Event discriminator)                   |
 | payload           | [Dynamic]        | Binary payload specific to eventType          |
 +-------------------+------------------+-----------------------------------------------+
 ```
@@ -288,6 +288,40 @@ Spears=5, Blocking=6, Axes=7, Bows=8, ElementalMagic=9, BloodMagic=10,
 Unarmed=11, Pickaxes=12, WoodCutting=13, Crossbows=14, Jump=100, Sneak=101,
 Run=102, Swim=103, Fishing=104, Cooking=105, Farming=106, Crafting=107,
 Dodge=108, Ride=110`.
+
+---
+
+#### Event Type 13: `TitleRequest` (Title Picker)
+Sent by the player's own `/title` (chat) or `title` (F5 console) command — see the README's "Picking your title"
+section. Not tied to any Harmony hook; the player triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
+answer (see §2.x `RavensCall_TitleReply_V1` below); an older server silently ignores it like any other unknown
+event type.
+
+| Field # | Name | Type | Description / Notes |
+|---|---|---|---|
+| 1 | `schemaVersion` | `int` | `2` |
+| 2 | `eventType` | `byte` | `13` (`EventType.TitleRequest`) |
+| 3 | `playerName` | `string` | `Player.m_localPlayer.GetPlayerName()` |
+| 4 | `op` | `byte` | `1` = List (send my earned titles), `2` = Set, `3` = Clear |
+| 5 | `title` | `string` | The requested title for op `2`, `""` otherwise. Client-trimmed; the server additionally caps it at 64 chars |
+
+---
+
+### 2.x `RavensCall_TitleReply_V1` (Server → Client)
+A new routed RPC, separate from `RavensCall_EventReport_V2` — this mod only ever *sends* on the event-report
+channel, so a reply needs a channel of its own. Registered once per world session on a `ZNet.Awake` postfix, the
+same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.instance` is recreated every time
+`ZNet.Awake` runs — decomp/ZNet.cs — so re-registering there is correct, not a leak). TheRavensCall sends this
+**only to the requesting peer**, never broadcast, and this mod prints the text straight into whichever Terminal
+(chat box or F5 console) the `title` command was typed in, prefixed `[WhereTheCrowFlies]`. A player who sends a
+request and gets no reply within 5 seconds sees a one-time local hint instead ("title picking needs TheRavensCall
+1.7.0 or newer") — this mod does not retry the request.
+
+| Field # | Name | Type | Description / Notes |
+|---|---|---|---|
+| 1 | `schemaVersion` | `int` | `1` |
+| 2 | `kind` | `byte` | `1` = ok / informational, `2` = refused |
+| 3 | `text` | `string` | One human-readable line, already final — no localisation tokens, printed verbatim |
 
 ---
 

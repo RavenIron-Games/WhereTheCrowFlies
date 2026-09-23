@@ -2,6 +2,31 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
+## [1.2.0] - 2026-09-22
+
+### Added
+- **`/title` command (chat) and `title` command (F5 console)**: pick which of your earned titles shows next to your
+  name on servers running **TheRavensCall 1.7.0+**. `title` alone lists what you've earned and which one is active,
+  `title <name>` (multi-word titles supported, e.g. `title Wolf Hunter`) sets it, `title clear` removes it. The
+  server has the only say on which titles you've actually earned — this mod just sends the request and prints
+  whatever TheRavensCall answers.
+- **`RavensCall_EventReport_V2` Event Type 13 (`TitleRequest`)**: the wire packet `/title` sends — schema version 2,
+  op `1` = list, `2` = set, `3` = clear. See `HANDOFF.md` §2.2 for the full layout.
+- **`RavensCall_TitleReply_V1`**: a new server → client routed RPC, registered once per world session the same way
+  TheRavensCall registers its own listeners. TheRavensCall sends the reply text directly to the requesting player;
+  this mod prints it back into whichever window (chat box or F5 console) the command was typed in, prefixed
+  `[WhereTheCrowFlies]`.
+- **`ravenscall title <player> [<title>|clear]`**: the existing admin routing stub's description now mentions the
+  matching admin subcommand TheRavensCall 1.7.0 adds — no wire change on this mod's side, the stub only ever routes
+  the raw command text to the server.
+
+### Compatibility
+- Pairs with **TheRavensCall 1.7.0+** for `/title` to get an answer. On an older TheRavensCall, the request still
+  sends (Event Type 13 is just another `RavensCall_EventReport_V2` payload) but nothing replies, so after 5 seconds
+  this mod prints a one-time hint that title picking needs TheRavensCall 1.7.0 or newer. An older TheRavensCall with
+  `LogCombatReports` enabled will additionally log an "unknown eventType 13" line server-side — harmless, just noise.
+- Every other event type, and every server this mod already worked with, is unchanged.
+
 ## [1.1.3] - 2026-09-15
 
 ### Fixed

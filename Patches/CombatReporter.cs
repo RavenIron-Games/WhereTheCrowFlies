@@ -28,6 +28,7 @@ namespace WhereTheCrowFlies.Patches
         // one flush interval, no matter what it missed.
         public const byte StatSnapshot = 11;
         public const byte SkillSnapshot = 12;
+        public const byte TitleRequest = 13;
     }
 
     // One entry in a SkillSnapshot payload: a single Skills.SkillType the
@@ -69,6 +70,15 @@ namespace WhereTheCrowFlies.Patches
         public const byte Other = 3;
     }
 
+    // Sub-operation for EventType.TitleRequest — mirrors TheRavensCall's
+    // HandleTitleRequest switch (Saga.cs) exactly, wire-for-wire.
+    public static class TitleOp
+    {
+        public const byte List = 1;
+        public const byte Set = 2;
+        public const byte Clear = 3;
+    }
+
     #endregion
 
     #region Telemetry Sender
@@ -77,6 +87,11 @@ namespace WhereTheCrowFlies.Patches
     {
         private const string RpcNameV1 = "RavensCall_CombatReport_V1";
         private const string RpcNameV2 = "RavensCall_EventReport_V2";
+
+        // Server -> client only; the client never sends on this name. Kept
+        // here (not private) so the ZNet.Awake registration patch below and
+        // TitlePicker can both reference the one literal.
+        internal const string RpcNameTitleReply = "RavensCall_TitleReply_V1";
 
         private static bool IsConnected()
         {
@@ -453,6 +468,30 @@ namespace WhereTheCrowFlies.Patches
             }
         }
 
+        // Player-initiated title pick/list/clear request. Unlike every other
+        // V2 sender above, this one isn't fed by a Harmony hook — it's called
+        // directly from TitlePicker.HandleCommand — and it never dual-sends a
+        // V1 packet: there is no V1 equivalent for this event type.
+        public static void SendTitleRequest(byte op, string title)
+        {
+            try
+            {
+                if (!IsConnected() || Player.m_localPlayer == null) return;
+
+                var pkg = new ZPackage();
+                pkg.Write(2); // schemaVersion 2
+                pkg.Write(EventType.TitleRequest);
+                pkg.Write(Player.m_localPlayer.GetPlayerName());
+                pkg.Write(op);
+                pkg.Write(title ?? "");
+                ZRoutedRpc.instance.InvokeRoutedRPC(RpcNameV2, pkg);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] SendTitleRequest failed: {ex.Message}");
+            }
+        }
+
         #endregion
     }
 
@@ -739,7 +778,7 @@ namespace WhereTheCrowFlies.Patches
             {
                 if (Terminal.commands != null && Terminal.commands.ContainsKey("ravenscall")) return;
                 new Terminal.ConsoleCommand("ravenscall",
-                    "Server admin command (TheRavensCall): ravenscall season start [name] | ravenscall season end. Runs on the server; needs admin.",
+                    "Server admin command (TheRavensCall): ravenscall season start [name] | ravenscall season end | ravenscall title <player> [<title>|clear]. Runs on the server; needs admin.",
                     args => args.Context?.AddString("[WhereTheCrowFlies] ravenscall runs on the server; the output is in the server console."),
                     onlyServer: true, remoteCommand: true);
             }
@@ -747,6 +786,205 @@ namespace WhereTheCrowFlies.Patches
             {
                 Plugin.Log?.LogWarning($"[WhereTheCrowFlies] console routing stub failed: {ex.Message}");
             }
+        }
+    }
+
+    // The player-facing title picker. "title" is a normal (not onlyServer,
+    // not remoteCommand, not isCheat) command: Chat.InputText sends anything
+    // starting with '/' through Terminal.TryRunCommand with the slash
+    // stripped, so this same registration answers both `/title …` in chat and
+    // `title …` at the F5 console (decomp/Chat.cs InputText, decomp/Terminal.cs
+    // TryRunCommand). Registered in the same InitTerminal postfix as the
+    // ravenscall stub above and guarded the same way, in case another mod
+    // ever claims the name first.
+    [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
+    internal static class Patch_TitleCommand
+    {
+        private static void Postfix()
+        {
+            try
+            {
+                if (Terminal.commands != null && Terminal.commands.ContainsKey("title"))
+                {
+                    Plugin.Log?.LogWarning("[WhereTheCrowFlies] a 'title' console command is already registered by another mod; the title picker will not run.");
+                    return;
+                }
+
+                new Terminal.ConsoleCommand("title",
+                    "Pick the title shown next to your name on servers running TheRavensCall 1.7.0+: title (list yours) | title <name> | title clear",
+                    TitlePicker.HandleCommand,
+                    optionsFetcher: TitlePicker.GetTabOptions,
+                    alwaysRefreshTabOptions: true);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title command registration failed: {ex.Message}");
+            }
+        }
+    }
+
+    #endregion
+
+    #region Title Picker
+
+    // Registers the server -> client title reply once per world session.
+    // ZNet.Awake is where TheRavensCall itself registers its own routed RPCs
+    // (Saga.cs ~400, "Per-world-session registration — ZRoutedRpc.instance is
+    // new every time ZNet.Awake runs"): decomp/ZNet.cs Awake() shows
+    // `m_routedRpc = new ZRoutedRpc(m_isServer)` is recreated on every Awake,
+    // on both the client and the server/listen host, so a postfix here fires
+    // exactly once per fresh ZRoutedRpc instance and never collides with a
+    // stale registration from a previous session (ZRoutedRpc.Register uses
+    // Dictionary.Add, which throws on a genuine duplicate key on the *same*
+    // instance — a new instance each Awake avoids that).
+    [HarmonyPatch(typeof(ZNet), nameof(ZNet.Awake))]
+    internal static class Patch_RegisterTitleReply
+    {
+        private static void Postfix()
+        {
+            try
+            {
+                ZRoutedRpc.instance?.Register<ZPackage>(TelemetrySender.RpcNameTitleReply, TitlePicker.RPC_OnTitleReply);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title reply RPC registration failed: {ex.Message}");
+            }
+        }
+    }
+
+    // Client side of the title picker: sends the `title` console command as
+    // a TitleRequest (EventType 13) and prints TheRavensCall's
+    // RavensCall_TitleReply_V1 answer back into whichever Terminal the
+    // player typed in. Silent no-op against a server that doesn't answer
+    // (older TheRavensCall, or a vanilla server) apart from the one 5-second
+    // hint below — same "safe everywhere" contract as every other event type.
+    internal static class TitlePicker
+    {
+        private const float ReplyTimeoutSeconds = 5f;
+
+        // Only one request is ever pending: a new command overwrites both of
+        // these, which is exactly "a new one restarts the timer" from the spec.
+        private static Terminal _pendingContext;
+        private static float _pendingSince = -1f;
+
+        private static List<string> _tabOptions = new List<string>();
+
+        public static void HandleCommand(Terminal.ConsoleEventArgs args)
+        {
+            try
+            {
+                _pendingContext = args.Context;
+
+                if (ZNet.instance == null || ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected || ZNet.instance.IsServer())
+                {
+                    // Covers both "not connected yet" and singleplayer/listen-host,
+                    // where there is no separate server to hold titles.
+                    Print(args.Context, "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer.");
+                    return;
+                }
+
+                byte op;
+                string title = "";
+                if (args.Length < 2)
+                {
+                    op = TitleOp.List;
+                }
+                else if (string.Equals(args[1], "clear", StringComparison.OrdinalIgnoreCase))
+                {
+                    op = TitleOp.Clear;
+                }
+                else
+                {
+                    op = TitleOp.Set;
+                    title = (args.ArgsAll ?? "").Trim(); // multi-word titles, e.g. "title Wolf Hunter"
+                }
+
+                TelemetrySender.SendTitleRequest(op, title);
+                _pendingSince = Time.realtimeSinceStartup;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title command failed: {ex.Message}");
+            }
+        }
+
+        public static void RPC_OnTitleReply(long sender, ZPackage pkg)
+        {
+            try
+            {
+                _pendingSince = -1f; // any reply — even one we fail to parse below — cancels the pending timer
+                if (pkg == null || pkg.Size() == 0) return;
+
+                int schemaVersion = pkg.ReadInt();
+                if (schemaVersion != 1) return;
+
+                pkg.ReadByte(); // kind: 1 = ok/informational, 2 = refused — both print the same way
+                string text = pkg.ReadString();
+
+                Print(_pendingContext, text);
+                UpdateTabOptionsFromReply(text);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title reply handling failed: {ex.Message}");
+            }
+        }
+
+        // Called from TelemetryTicker.Update (Plugin.cs) every frame.
+        public static void Tick(float dt)
+        {
+            if (_pendingSince < 0f) return;
+            if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
+
+            _pendingSince = -1f;
+            Print(_pendingContext, "No answer from the server — title picking needs TheRavensCall 1.7.0 or newer.");
+        }
+
+        public static List<string> GetTabOptions()
+        {
+            return _tabOptions;
+        }
+
+        // Tolerant parse of "Your titles: A, B, C (active: B)" (also present,
+        // verbatim, on a "you have not earned that title" refusal) into the
+        // tab-completion cache. Anything else — the empty-list line, the usage
+        // line, a "title set"/"title cleared" confirmation — leaves the
+        // existing cache untouched rather than clearing it.
+        private static void UpdateTabOptionsFromReply(string text)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(text)) return;
+
+                const string marker = "Your titles:";
+                int idx = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) return;
+
+                string list = text.Substring(idx + marker.Length).Trim();
+                int activeIdx = list.IndexOf(" (active:", StringComparison.OrdinalIgnoreCase);
+                if (activeIdx >= 0) list = list.Substring(0, activeIdx);
+
+                var titles = new List<string>();
+                foreach (var part in list.Split(','))
+                {
+                    string t = part.Trim();
+                    if (!string.IsNullOrEmpty(t)) titles.Add(t);
+                }
+                if (titles.Count > 0) _tabOptions = titles;
+            }
+            catch
+            {
+                // Tolerant parse only: never let unexpected server text throw.
+            }
+        }
+
+        private static void Print(Terminal context, string text)
+        {
+            string line = "[WhereTheCrowFlies] " + text;
+            if (context != null) { context.AddString(line); return; }
+            if (Chat.instance != null) { Chat.instance.AddString(line); return; }
+            if (Console.instance != null) { Console.instance.AddString(line); }
         }
     }
 

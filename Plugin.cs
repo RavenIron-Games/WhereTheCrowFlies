@@ -12,7 +12,7 @@ namespace WhereTheCrowFlies
     {
         public const string PluginGUID = "com.raveniron.wherethecrowflies";
         public const string PluginName = "WhereTheCrowFlies";
-        public const string PluginVersion = "1.1.3";
+        public const string PluginVersion = "1.2.0";
 
         public static ManualLogSource Log;
         public static ConfigEntry<bool> EnableReporting;
@@ -69,6 +69,7 @@ namespace WhereTheCrowFlies
         private void Update()
         {
             TelemetryAccumulator.Tick(Time.deltaTime);
+            Patches.TitlePicker.Tick(Time.deltaTime);
         }
     }
 }

@@ -6,7 +6,7 @@
 [![Deployment](https://img.shields.io/badge/Install-Client_Only-blue.svg)]()
 [![Framework](https://img.shields.io/badge/Requires-BepInEx-red.svg)]()
 [![Publisher](https://img.shields.io/badge/RavenIron-Release-8B6F1F.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.3-lightgrey.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.2.0-lightgrey.svg)]()
 
 **RavenIron's client companion mod for The Raven's Call: effortlessly witnesses and relays player combat, defense, kills, deaths, crafting, building, foraging, consumption, rituals, and 100% of vanilla stats to the hall's ledger.**
 
@@ -42,7 +42,7 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 ## 📦 Installation
 
 1. Install **BepInEx for Valheim**.
-2. Download and extract **`WhereTheCrowFlies-v1.1.3.zip`**.
+2. Download and extract **`WhereTheCrowFlies-v1.2.0.zip`**.
 3. Place `WhereTheCrowFlies.dll` into your `Valheim/BepInEx/plugins/` directory.
 
 ---
@@ -59,6 +59,21 @@ A configuration file is generated at `BepInEx/config/com.raveniron.wherethecrowf
 # Default value: true
 EnableReporting = true
 ```
+
+---
+
+## 🏷️ Picking your title
+
+On a server running **TheRavensCall 1.7.0+**, use the `title` command to choose which of your earned titles shows
+next to your name:
+
+- Chat box: `/title` (list what you've earned), `/title Wolf Hunter` (set — multi-word titles work), `/title clear`
+  (remove it).
+- F5 console: same commands without the leading `/` — `title`, `title Wolf Hunter`, `title clear`.
+
+The server decides which titles you've actually earned; this mod only sends the request and prints the answer back
+where you typed it. Against an older TheRavensCall, or no TheRavensCall at all, nothing answers and you'll see a
+one-time hint after a few seconds — everything else in this mod keeps working normally.
 
 ---
 
