@@ -316,13 +316,37 @@ same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.i
 (chat box or F5 console) the `title` command was typed in, prefixed `[WhereTheCrowFlies]`. A player who sends a
 request and gets no reply within 5 seconds sees a one-time local hint instead ("No answer from the server — it needs
 TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.") — this mod does not retry the request. The handler
-accepts the packet only from the server peer's uid; it never does anything but print the text.
+accepts the packet only from the server peer's uid; it never does anything but print the text and, since 1.2.0,
+hand the parsed reply to the title panel (below) so it stays fresh with no second round trip.
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|
 | 1 | `schemaVersion` | `int` | `1` |
 | 2 | `kind` | `byte` | `1` = ok / informational, `2` = refused |
 | 3 | `text` | `string` | One human-readable line, already final — no localisation tokens, printed verbatim |
+| 4 | `count` | `int` | Number of earned titles (server: `rec.EarnedTitles.Count`; this mod clamps its read to `0..256` and stops reading past that) |
+| 5 | `title` × `count` | `string` | The earned titles, in the same order the server's own comma list uses |
+| 6 | `active` | `string` | `rec.ActiveTitle`, `""` = none |
+
+Every reply carries fields 4–6 — list, set, clear, even a refusal — so the title panel below is always fresh
+after any op. A reply that ends after field 3 (`text`) is read as carrying no list — tolerated, not thrown on —
+which only matters against something other than TheRavensCall 1.7.0+ registered under this same RPC name.
+
+---
+
+### 2.3a The title panel (`titles` command / `TitlePanelKey`, 1.2.0)
+`Patches/TitlePanel.cs` is a small IMGUI window, on the family's shared gilt-frame theme
+(`Libs/SharedUI/GiltFrameTheme.cs`, vendored byte-for-byte from ValkyriesCargo, MIT, by Wubarrk), that lists the
+player's earned titles as buttons and sends the same `TitleOp.Set` / `TitleOp.Clear` requests the `title` command
+does (`TitlePicker.Send`, factored out of `HandleCommand` for exactly this reuse). It opens on the `titles`
+command (chat `/titles`, F5 `titles` — registered the same way as `title`, see §2.2) or the configurable
+`TitlePanelKey` (`KeyCode.None` by default — command only), and closes on Escape, the key again, a vanilla window
+opening over it (`InventoryGui`, `Menu`, `Minimap`, `StoreGui`), or the player dying or the world going away. While
+open it is modal the way the game's own sign-text dialog is: a Harmony postfix on `TextInput.IsVisible()` returns
+`true` while the panel is open, which is read by exactly six game systems (movement/attacks/hotbar, look, the
+mouse cursor, the pause menu, the map key, and chat) and by nothing else — see the postfix's own comment for the
+citations. It asks the server for the list on open and refreshes after every click, the same as every other panel
+in the family (ValkyriesCargo's Cargo Terminal, YggdrasilsReckoning's Anvil menu).
 
 ---
 

@@ -789,46 +789,64 @@ namespace WhereTheCrowFlies.Patches
         }
     }
 
-    // The player-facing title picker. "title" is a normal (not onlyServer,
-    // not remoteCommand, not isCheat) command: Chat.InputText sends anything
+    // The player-facing title commands. Both are normal (not onlyServer, not
+    // remoteCommand, not isCheat) commands: Chat.InputText sends anything
     // starting with '/' through Terminal.TryRunCommand with the slash
     // stripped, so this same registration answers both `/title …` in chat and
     // `title …` at the F5 console (decomp/Chat.cs InputText, decomp/Terminal.cs
-    // TryRunCommand). Registered in the same InitTerminal postfix as the
-    // ravenscall stub above and guarded the same way, in case another mod
-    // ever claims the name first.
+    // TryRunCommand) — and the same for `/titles` / `titles`. Registered in
+    // the same InitTerminal postfix as the ravenscall stub above, each
+    // guarded independently so one being claimed by a foreign mod never
+    // stops the other from registering.
     [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
     internal static class Patch_TitleCommand
     {
         // InitTerminal's body self-guards with a static flag, but the Harmony
         // postfix still runs on every call (Console and Chat both derive from
         // Terminal, and Chat is recreated per world session), so from the
-        // second call onward Terminal.commands already contains "title" —
+        // second call onward Terminal.commands already contains these names —
         // registered by this same patch, not a foreign mod. Track our own
-        // registration instead of inferring it from the dictionary, so the
-        // warning below only fires for a genuine foreign owner (review
+        // registrations instead of inferring them from the dictionary, so the
+        // warnings below only fire for a genuine foreign owner (review
         // 2026-09-22).
         private static bool _registered;
+        private static bool _titlesRegistered;
 
         private static void Postfix()
         {
             try
             {
-                if (_registered) return;
-
-                if (Terminal.commands != null && Terminal.commands.ContainsKey("title"))
+                if (!_registered)
                 {
-                    Plugin.Log?.LogWarning("[WhereTheCrowFlies] a 'title' console command is already registered by another mod; the title picker will not run.");
-                    return;
+                    if (Terminal.commands != null && Terminal.commands.ContainsKey("title"))
+                    {
+                        Plugin.Log?.LogWarning("[WhereTheCrowFlies] a 'title' console command is already registered by another mod; the title picker will not run.");
+                    }
+                    else
+                    {
+                        new Terminal.ConsoleCommand("title",
+                            "Pick which of your earned titles the server shows with your name in its Discord narration, Chronicle log and web dashboard (TheRavensCall 1.7.0+); nothing changes on your in-game nameplate: title (list yours) | title <name> | title clear",
+                            TitlePicker.HandleCommand,
+                            optionsFetcher: TitlePicker.GetTabOptions,
+                            alwaysRefreshTabOptions: true);
+                        _registered = true;
+                    }
                 }
 
-                new Terminal.ConsoleCommand("title",
-                    "Pick which of your earned titles the server shows with your name in its Discord narration, Chronicle log and web dashboard (TheRavensCall 1.7.0+); nothing changes on your in-game nameplate: title (list yours) | title <name> | title clear",
-                    TitlePicker.HandleCommand,
-                    optionsFetcher: TitlePicker.GetTabOptions,
-                    alwaysRefreshTabOptions: true);
-
-                _registered = true;
+                if (!_titlesRegistered)
+                {
+                    if (Terminal.commands != null && Terminal.commands.ContainsKey("titles"))
+                    {
+                        Plugin.Log?.LogWarning("[WhereTheCrowFlies] a 'titles' console command is already registered by another mod; the title panel will not open from chat/console (the TitlePanelKey config still will).");
+                    }
+                    else
+                    {
+                        new Terminal.ConsoleCommand("titles",
+                            "Open the title panel (TheRavensCall 1.7.0+): pick which earned title the server shows with your name.",
+                            args => TitlePanel.Open(args.Context));
+                        _titlesRegistered = true;
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -884,20 +902,38 @@ namespace WhereTheCrowFlies.Patches
 
         private static List<string> _tabOptions = new List<string>();
 
+        // Factored out of HandleCommand (review 2026-09-22, SPEC-title-ui.md)
+        // so the title panel (Patches/TitlePanel.cs) can send the exact same
+        // connectivity-checked, timer-armed request a typed `title` command
+        // sends, without duplicating either the "not connected" local line or
+        // the pending-timeout bookkeeping. `context` is remembered as where
+        // the reply should print (a chat box, an F5 console, or null for a
+        // key-opened panel — see Print below). On failure the local line is
+        // already printed (and echoed into the panel if it is open — see
+        // Print/OnLocal) before this returns false.
+        internal static bool Send(byte op, string title, Terminal context)
+        {
+            _pendingContext = context;
+
+            if (ZNet.instance == null || ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected || ZNet.instance.IsServer())
+            {
+                // Covers both "not connected yet" and singleplayer/listen-host,
+                // where there is no separate server to hold titles.
+                const string msg = "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer.";
+                Print(context, msg);
+                if (TitlePanel.IsOpen) TitlePanel.OnLocal(msg);
+                return false;
+            }
+
+            TelemetrySender.SendTitleRequest(op, title);
+            _pendingSince = Time.realtimeSinceStartup;
+            return true;
+        }
+
         public static void HandleCommand(Terminal.ConsoleEventArgs args)
         {
             try
             {
-                _pendingContext = args.Context;
-
-                if (ZNet.instance == null || ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected || ZNet.instance.IsServer())
-                {
-                    // Covers both "not connected yet" and singleplayer/listen-host,
-                    // where there is no separate server to hold titles.
-                    Print(args.Context, "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer.");
-                    return;
-                }
-
                 byte op;
                 string title = "";
                 if (args.Length < 2)
@@ -914,8 +950,7 @@ namespace WhereTheCrowFlies.Patches
                     title = (args.ArgsAll ?? "").Trim(); // multi-word titles, e.g. "title Wolf Hunter"
                 }
 
-                TelemetrySender.SendTitleRequest(op, title);
-                _pendingSince = Time.realtimeSinceStartup;
+                Send(op, title, args.Context);
             }
             catch (Exception ex)
             {
@@ -952,11 +987,33 @@ namespace WhereTheCrowFlies.Patches
                 int schemaVersion = pkg.ReadInt();
                 if (schemaVersion != 1) return;
 
-                pkg.ReadByte(); // kind: 1 = ok/informational, 2 = refused — both print the same way
+                byte kind = pkg.ReadByte(); // 1 = ok/informational, 2 = refused — both print the same way
                 string text = pkg.ReadString();
 
+                // Schema 1 grew a trailing earned-title list + active title
+                // (SPEC-title-ui.md: count, title x count, active) so the
+                // panel is fresh after every op with no second round trip.
+                // Every reply TheRavensCall 1.7.0+ sends carries it, but this
+                // stays tolerant of the package simply ending after `text` —
+                // a reply from anything else registered under this RPC name
+                // is then treated as carrying no list, rather than thrown on.
+                List<string> titles = null;
+                string active = null;
+                if (pkg.GetPos() < pkg.Size())
+                {
+                    int count = Mathf.Clamp(pkg.ReadInt(), 0, 256); // defensive clamp; the server's real count is a handful
+                    titles = new List<string>(count);
+                    for (int i = 0; i < count; i++) titles.Add(pkg.ReadString());
+                    active = pkg.GetPos() < pkg.Size() ? pkg.ReadString() : "";
+                }
+
                 Print(_pendingContext, text);
-                UpdateTabOptionsFromReply(text);
+                // The structured list replaces the old "Your titles:" text
+                // parse for tab completion too; a reply with no list (the
+                // tolerant fallback above) leaves the existing cache alone
+                // rather than clearing it.
+                if (titles != null) _tabOptions = titles;
+                TitlePanel.OnReply(kind, text, titles ?? new List<string>(), active ?? "");
             }
             catch (Exception ex)
             {
@@ -973,7 +1030,9 @@ namespace WhereTheCrowFlies.Patches
                 if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
 
                 _pendingSince = -1f;
-                Print(_pendingContext, "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.");
+                const string hint = "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.";
+                Print(_pendingContext, hint);
+                if (TitlePanel.IsOpen) TitlePanel.OnLocal(hint);
             }
             catch (Exception ex)
             {
@@ -985,39 +1044,6 @@ namespace WhereTheCrowFlies.Patches
         public static List<string> GetTabOptions()
         {
             return _tabOptions;
-        }
-
-        // Tolerant parse of "Your titles: A, B, C (active: B)" (also present,
-        // verbatim, on a "you have not earned that title" refusal) into the
-        // tab-completion cache. Anything else — the empty-list line, the usage
-        // line, a "title set"/"title cleared" confirmation — leaves the
-        // existing cache untouched rather than clearing it.
-        private static void UpdateTabOptionsFromReply(string text)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(text)) return;
-
-                const string marker = "Your titles:";
-                int idx = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-                if (idx < 0) return;
-
-                string list = text.Substring(idx + marker.Length).Trim();
-                int activeIdx = list.IndexOf(" (active:", StringComparison.OrdinalIgnoreCase);
-                if (activeIdx >= 0) list = list.Substring(0, activeIdx);
-
-                var titles = new List<string>();
-                foreach (var part in list.Split(','))
-                {
-                    string t = part.Trim();
-                    if (!string.IsNullOrEmpty(t)) titles.Add(t);
-                }
-                if (titles.Count > 0) _tabOptions = titles;
-            }
-            catch
-            {
-                // Tolerant parse only: never let unexpected server text throw.
-            }
         }
 
         private static void Print(Terminal context, string text)

@@ -17,7 +17,12 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **`RavensCall_TitleReply_V1`**: a new server → client routed RPC, registered once per world session the same way
   TheRavensCall registers its own listeners. TheRavensCall sends the reply text directly to the requesting player;
   this mod prints it back into whichever window (chat box or F5 console) the command was typed in, prefixed
-  `[WhereTheCrowFlies]`.
+  `[WhereTheCrowFlies]`. The reply now also carries the requesting player's full earned-title list and active
+  title, so the title panel below is always fresh after any op with no second round trip.
+- **The title panel (`/titles` chat, `titles` F5 console, or the new `TitlePanelKey` config)**: a small window, on
+  the family's shared gilt-frame theme (vendored from ValkyriesCargo, MIT, by Wubarrk), listing every title
+  you've earned as a button — click one to set it, "No title" to clear it, Esc or Close to leave. It asks the
+  server on open and refreshes after every click over the same wire the `title` command uses.
 - **`ravenscall title <player> [<title>|clear]`**: the existing admin routing stub's description now mentions the
   matching admin subcommand TheRavensCall 1.7.0 adds — no wire change on this mod's side, the stub only ever routes
   the raw command text to the server.

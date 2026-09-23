@@ -58,24 +58,33 @@ A configuration file is generated at `BepInEx/config/com.raveniron.wherethecrowf
 # Setting type: Boolean
 # Default value: true
 EnableReporting = true
+
+## Key that opens the title panel (the same panel the /titles command opens). None = command only. Read through the game's own input layer (ZInput), so it works with Valheim 1.0's input system.
+# Setting type: KeyCode
+# Default value: None
+TitlePanelKey = None
 ```
 
 ---
 
 ## 🏷️ Picking your title
 
-On a server running **TheRavensCall 1.7.0+**, use the `title` command to choose which of your earned titles the
-server shows with your name in its Discord narration, Chronicle log and web dashboard — nothing changes on your
-in-game nameplate:
+On a server running **TheRavensCall 1.7.0+**, choose which of your earned titles the server shows with your name
+in its Discord narration, Chronicle log and web dashboard — nothing changes on your in-game nameplate. Two ways
+to do it:
 
-- Chat box: `/title` (list what you've earned), `/title Wolf Hunter` (set — multi-word titles work), `/title clear`
-  (shows no title, and stays that way: titles you earn later are listed, not shown, until you pick one).
-- F5 console: same commands without the leading `/` — `title`, `title Wolf Hunter`, `title clear`.
+- **The title panel**: `/titles` (chat) or `titles` (F5 console) opens a small window listing everything you've
+  earned. Click one to set it, "No title" to clear it, Esc or Close to leave. It asks the server on open and
+  refreshes after every click, so it always shows the true state. You can also open it with a key of your own
+  choosing — set `TitlePanelKey` in the config above (`None` by default, command only).
+- **The `title` command**, with no window: `/title` (list what you've earned), `/title Wolf Hunter` (set —
+  multi-word titles work), `/title clear` (shows no title, and stays that way: titles you earn later are listed,
+  not shown, until you pick one). F5 console: same commands without the leading `/`.
 
-The server decides which titles you've actually earned; this mod only sends the request and prints the answer back
-where you typed it. Against an older TheRavensCall, a server with `AcceptClientReports` turned off, or no
-TheRavensCall at all, nothing answers and you'll see a one-time hint after a few seconds that names both possible
-causes — everything else in this mod keeps working normally.
+The server decides which titles you've actually earned; this mod only sends the request and prints (or shows in
+the panel) whatever TheRavensCall answers. Against an older TheRavensCall, a server with `AcceptClientReports`
+turned off, or no TheRavensCall at all, nothing answers and you'll see a one-time hint after a few seconds that
+names both possible causes — everything else in this mod keeps working normally.
 
 ---
 
