@@ -45,14 +45,14 @@ WhereTheCrowFlies v1.1.0 broadcasts on two routed RPC channels:
 
 All V2 packets begin with a 5-byte header:
 1. `schemaVersion` (`int` / 4 bytes): Always `2`.
-2. `eventType` (`byte` / 1 byte): Enum value `1` to `12`.
+2. `eventType` (`byte` / 1 byte): Enum value `1` to `13`.
 
 ```
 +-------------------+------------------+-----------------------------------------------+
 | Field Name        | Type             | Description / Value Range                     |
 +-------------------+------------------+-----------------------------------------------+
 | schemaVersion     | int              | 2                                             |
-| eventType         | byte             | 1..12 (Event discriminator)                   |
+| eventType         | byte             | 1..13 (Event discriminator)                   |
 | payload           | [Dynamic]        | Binary payload specific to eventType          |
 +-------------------+------------------+-----------------------------------------------+
 ```
@@ -291,7 +291,68 @@ Dodge=108, Ride=110`.
 
 ---
 
-### 2.3 Legacy `RavensCall_CombatReport_V1` Specification
+#### Event Type 13: `TitleRequest` (Title Picker)
+Sent by the player's own `/title` (chat) or `title` (F5 console) command, and by the title panel (§2.3a) — on
+open (op 1) and on every click (ops 2/3) — see the README's "Picking your title" section. Not tied to any Harmony
+hook; the player (or their click on the panel) triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
+answer (see §2.3 `RavensCall_TitleReply_V1` below); an older server drops it like any other unknown event type
+(one "unknown eventType 13" log line, only with `LogCombatReports` on).
+
+| Field # | Name | Type | Description / Notes |
+|---|---|---|---|
+| 1 | `schemaVersion` | `int` | `2` |
+| 2 | `eventType` | `byte` | `13` (`EventType.TitleRequest`) |
+| 3 | `playerName` | `string` | `Player.m_localPlayer.GetPlayerName()` |
+| 4 | `op` | `byte` | `1` = List (send my earned titles), `2` = Set, `3` = Clear |
+| 5 | `title` | `string` | The requested title for op `2`, `""` otherwise. Client-trimmed; the server additionally caps it at 64 chars |
+
+---
+
+### 2.3 `RavensCall_TitleReply_V1` (Server → Client)
+A new routed RPC, separate from `RavensCall_EventReport_V2` — this mod only ever *sends* on the event-report
+channel, so a reply needs a channel of its own. Registered once per world session on a `ZNet.Awake` postfix, the
+same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.instance` is recreated every time
+`ZNet.Awake` runs — decomp/ZNet.cs — so re-registering there is correct, not a leak). TheRavensCall sends this
+**only to the requesting peer**, never broadcast, and this mod prints the text straight into whichever Terminal
+(chat box or F5 console) the `title` command was typed in, prefixed `[WhereTheCrowFlies]`. A player who sends a
+request and gets no reply within 5 seconds sees a one-time local hint instead ("No answer from the server — it needs
+TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.") — this mod does not retry the request. The handler
+accepts the packet only from the server peer's uid; it never does anything but print the text and, since 1.2.0,
+hand the parsed list to the `title` command's tab completion and to the title panel (below), so both stay fresh with
+no second round trip.
+
+| Field # | Name | Type | Description / Notes |
+|---|---|---|---|
+| 1 | `schemaVersion` | `int` | `1` |
+| 2 | `kind` | `byte` | `1` = ok / informational, `2` = refused |
+| 3 | `text` | `string` | One human-readable line, already final — no localisation tokens, printed verbatim |
+| 4 | `count` | `int` | Number of earned titles (server: `rec.EarnedTitles.Count`; this mod clamps its read to `0..256` and stops reading past that) |
+| 5 | `title` × `count` | `string` | The earned titles, in the same order the server's own comma list uses |
+| 6 | `active` | `string` | `rec.ActiveTitle`, `""` = none |
+
+Every reply carries fields 4–6 — list, set, clear, even a refusal — so the title panel below is always fresh
+after any op. A reply that ends after field 3 (`text`) is read as carrying no list — tolerated, not thrown on —
+which only matters against something other than TheRavensCall 1.7.0+ registered under this same RPC name.
+
+---
+
+### 2.3a The title panel (`titles` command / `TitlePanelKey`, 1.2.0)
+`Patches/TitlePanel.cs` is a small IMGUI window, on the family's shared gilt-frame theme
+(`Libs/SharedUI/GiltFrameTheme.cs`, vendored byte-for-byte from ValkyriesCargo, MIT, by Wubarrk), that lists the
+player's earned titles as buttons and sends the same `TitleOp.Set` / `TitleOp.Clear` requests the `title` command
+does (`TitlePicker.Send`, factored out of `HandleCommand` for exactly this reuse). It opens on the `titles`
+command (chat `/titles`, F5 `titles` — registered the same way as `title`, see §2.2) or the configurable
+`TitlePanelKey` (`KeyCode.None` by default — command only), and closes on Escape, the key again, a vanilla window
+opening over it (`InventoryGui`, `Menu`, `Minimap`, `StoreGui`), or the player dying or the world going away. While
+open it is modal the way the game's own sign-text dialog is: a Harmony postfix on `TextInput.IsVisible()` returns
+`true` while the panel is open, which is read by exactly six game systems (movement/attacks/hotbar, look, the
+mouse cursor, the pause menu, the map key, and chat) and by nothing else — see the postfix's own comment for the
+citations. It asks the server for the list on open and refreshes after every click, the same as every other panel
+in the family (ValkyriesCargo's Cargo Terminal, YggdrasilsReckoning's Anvil menu).
+
+---
+
+### 2.4 Legacy `RavensCall_CombatReport_V1` Specification
 
 For backward compatibility with legacy servers:
 

@@ -61,6 +61,15 @@
     <Reference Include="UnityEngine.PhysicsModule">
       <HintPath>..\libs-Tools\UnityEngine.PhysicsModule.dll</HintPath>
     </Reference>
+    <!-- The title panel's IMGUI window and the vendored GiltFrameTheme (Libs/SharedUI) -->
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>..\libs-Tools\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>..\libs-Tools\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
