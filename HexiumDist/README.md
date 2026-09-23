@@ -69,7 +69,7 @@ server shows with your name in its Discord narration, Chronicle log and web dash
 in-game nameplate:
 
 - Chat box: `/title` (list what you've earned), `/title Wolf Hunter` (set — multi-word titles work), `/title clear`
-  (shows no title until you earn your next one, which becomes active automatically).
+  (shows no title, and stays that way: titles you earn later are listed, not shown, until you pick one).
 - F5 console: same commands without the leading `/` — `title`, `title Wolf Hunter`, `title clear`.
 
 The server decides which titles you've actually earned; this mod only sends the request and prints the answer back

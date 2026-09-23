@@ -9,7 +9,8 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   with your name in its Discord narration, Chronicle log and web dashboard on servers running **TheRavensCall
   1.7.0+** — nothing changes on your in-game nameplate. `title` alone lists what you've earned and which one is
   active, `title <name>` (multi-word titles supported, e.g. `title Wolf Hunter`) sets it, `title clear` shows no
-  title until you earn your next one, which becomes active automatically. The server has the only say on which
+  title (and on TheRavensCall 1.7.0 it stays that way: titles you earn later are listed, not shown, until you
+  pick one). The server has the only say on which
   titles you've actually earned — this mod just sends the request and prints whatever TheRavensCall answers.
 - **`RavensCall_EventReport_V2` Event Type 13 (`TitleRequest`)**: the wire packet `/title` sends — schema version 2,
   op `1` = list, `2` = set, `3` = clear. See `HANDOFF.md` §2.2 for the full layout.

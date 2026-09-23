@@ -294,8 +294,8 @@ Dodge=108, Ride=110`.
 #### Event Type 13: `TitleRequest` (Title Picker)
 Sent by the player's own `/title` (chat) or `title` (F5 console) command — see the README's "Picking your title"
 section. Not tied to any Harmony hook; the player triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
-answer (see §2.x `RavensCall_TitleReply_V1` below); an older server silently ignores it like any other unknown
-event type.
+answer (see §2.3 `RavensCall_TitleReply_V1` below); an older server drops it like any other unknown event type
+(one "unknown eventType 13" log line, only with `LogCombatReports` on).
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|
@@ -307,15 +307,16 @@ event type.
 
 ---
 
-### 2.x `RavensCall_TitleReply_V1` (Server → Client)
+### 2.3 `RavensCall_TitleReply_V1` (Server → Client)
 A new routed RPC, separate from `RavensCall_EventReport_V2` — this mod only ever *sends* on the event-report
 channel, so a reply needs a channel of its own. Registered once per world session on a `ZNet.Awake` postfix, the
 same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.instance` is recreated every time
 `ZNet.Awake` runs — decomp/ZNet.cs — so re-registering there is correct, not a leak). TheRavensCall sends this
 **only to the requesting peer**, never broadcast, and this mod prints the text straight into whichever Terminal
 (chat box or F5 console) the `title` command was typed in, prefixed `[WhereTheCrowFlies]`. A player who sends a
-request and gets no reply within 5 seconds sees a one-time local hint instead ("title picking needs TheRavensCall
-1.7.0 or newer") — this mod does not retry the request.
+request and gets no reply within 5 seconds sees a one-time local hint instead ("No answer from the server — it needs
+TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.") — this mod does not retry the request. The handler
+accepts the packet only from the server peer's uid; it never does anything but print the text.
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|
@@ -325,7 +326,7 @@ request and gets no reply within 5 seconds sees a one-time local hint instead ("
 
 ---
 
-### 2.3 Legacy `RavensCall_CombatReport_V1` Specification
+### 2.4 Legacy `RavensCall_CombatReport_V1` Specification
 
 For backward compatibility with legacy servers:
 

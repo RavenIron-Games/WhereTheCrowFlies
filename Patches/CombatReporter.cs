@@ -932,7 +932,15 @@ namespace WhereTheCrowFlies.Patches
                 // another player's client with a forged reply. Only accept this
                 // packet from the server itself, checked before anything else so
                 // a spoofed packet cannot even suppress the real timeout (review
-                // 2026-09-22).
+                // 2026-09-22). The server's routed id is ZDOMan.GetSessionID(),
+                // the same value it sends as its uid in PeerInfo, so
+                // GetServerPeer().m_uid is the right thing to compare against
+                // (decomp/ZNet.cs Awake + SendPeerInfo). Vanilla routing does
+                // carry m_senderPeerID inside the packet and relays it unchanged,
+                // so a peer that hand-crafts the whole RoutedRPCData can still
+                // claim the server's id; all that buys is one printed line under
+                // this prefix — the same reach as a chat message — because this
+                // handler never does anything but print.
                 long serverPeer = (ZNet.instance != null && !ZNet.instance.IsServer())
                     ? (ZNet.instance.GetServerPeer()?.m_uid ?? 0L)
                     : 0L;
@@ -959,11 +967,19 @@ namespace WhereTheCrowFlies.Patches
         // Called from TelemetryTicker.Update (Plugin.cs) every frame.
         public static void Tick(float dt)
         {
-            if (_pendingSince < 0f) return;
-            if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
+            try
+            {
+                if (_pendingSince < 0f) return;
+                if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
 
-            _pendingSince = -1f;
-            Print(_pendingContext, "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.");
+                _pendingSince = -1f;
+                Print(_pendingContext, "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.");
+            }
+            catch (Exception ex)
+            {
+                _pendingSince = -1f;
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] title timeout hint failed: {ex.Message}");
+            }
         }
 
         public static List<string> GetTabOptions()
@@ -1007,9 +1023,16 @@ namespace WhereTheCrowFlies.Patches
         private static void Print(Terminal context, string text)
         {
             string line = "[WhereTheCrowFlies] " + text;
-            if (context != null) { context.AddString(line); return; }
-            if (Chat.instance != null) { Chat.instance.AddString(line); return; }
-            if (Console.instance != null) { Console.instance.AddString(line); }
+            // `context != null` is Unity's overload: a Chat destroyed by a world
+            // reload reads as null and falls through to the live instance.
+            if (context == null) context = (Terminal)Chat.instance ?? Console.instance;
+            if (context == null) return;
+            context.AddString(line);
+            // Chat.Update hides the window m_hideDelay (10 s) after the last
+            // message; Terminal.AddString does not reset that clock, so a
+            // reply landing after the window hid would sit unseen until the
+            // next chat line. Same reset OnNewChatMessage does (decomp/Chat.cs).
+            if (context is Chat chat) chat.m_hideTimer = 0f;
         }
     }
 
