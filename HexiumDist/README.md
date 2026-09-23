@@ -64,16 +64,18 @@ EnableReporting = true
 
 ## 🏷️ Picking your title
 
-On a server running **TheRavensCall 1.7.0+**, use the `title` command to choose which of your earned titles shows
-next to your name:
+On a server running **TheRavensCall 1.7.0+**, use the `title` command to choose which of your earned titles the
+server shows with your name in its Discord narration, Chronicle log and web dashboard — nothing changes on your
+in-game nameplate:
 
 - Chat box: `/title` (list what you've earned), `/title Wolf Hunter` (set — multi-word titles work), `/title clear`
-  (remove it).
+  (shows no title until you earn your next one, which becomes active automatically).
 - F5 console: same commands without the leading `/` — `title`, `title Wolf Hunter`, `title clear`.
 
 The server decides which titles you've actually earned; this mod only sends the request and prints the answer back
-where you typed it. Against an older TheRavensCall, or no TheRavensCall at all, nothing answers and you'll see a
-one-time hint after a few seconds — everything else in this mod keeps working normally.
+where you typed it. Against an older TheRavensCall, a server with `AcceptClientReports` turned off, or no
+TheRavensCall at all, nothing answers and you'll see a one-time hint after a few seconds that names both possible
+causes — everything else in this mod keeps working normally.
 
 ---
 

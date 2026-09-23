@@ -800,10 +800,22 @@ namespace WhereTheCrowFlies.Patches
     [HarmonyPatch(typeof(Terminal), nameof(Terminal.InitTerminal))]
     internal static class Patch_TitleCommand
     {
+        // InitTerminal's body self-guards with a static flag, but the Harmony
+        // postfix still runs on every call (Console and Chat both derive from
+        // Terminal, and Chat is recreated per world session), so from the
+        // second call onward Terminal.commands already contains "title" —
+        // registered by this same patch, not a foreign mod. Track our own
+        // registration instead of inferring it from the dictionary, so the
+        // warning below only fires for a genuine foreign owner (review
+        // 2026-09-22).
+        private static bool _registered;
+
         private static void Postfix()
         {
             try
             {
+                if (_registered) return;
+
                 if (Terminal.commands != null && Terminal.commands.ContainsKey("title"))
                 {
                     Plugin.Log?.LogWarning("[WhereTheCrowFlies] a 'title' console command is already registered by another mod; the title picker will not run.");
@@ -811,10 +823,12 @@ namespace WhereTheCrowFlies.Patches
                 }
 
                 new Terminal.ConsoleCommand("title",
-                    "Pick the title shown next to your name on servers running TheRavensCall 1.7.0+: title (list yours) | title <name> | title clear",
+                    "Pick which of your earned titles the server shows with your name in its Discord narration, Chronicle log and web dashboard (TheRavensCall 1.7.0+); nothing changes on your in-game nameplate: title (list yours) | title <name> | title clear",
                     TitlePicker.HandleCommand,
                     optionsFetcher: TitlePicker.GetTabOptions,
                     alwaysRefreshTabOptions: true);
+
+                _registered = true;
             }
             catch (Exception ex)
             {
@@ -913,6 +927,17 @@ namespace WhereTheCrowFlies.Patches
         {
             try
             {
+                // Routed RPCs are relayed client-to-client by the server without
+                // checking the method name, so any modded peer could target
+                // another player's client with a forged reply. Only accept this
+                // packet from the server itself, checked before anything else so
+                // a spoofed packet cannot even suppress the real timeout (review
+                // 2026-09-22).
+                long serverPeer = (ZNet.instance != null && !ZNet.instance.IsServer())
+                    ? (ZNet.instance.GetServerPeer()?.m_uid ?? 0L)
+                    : 0L;
+                if (serverPeer == 0L || sender != serverPeer) return;
+
                 _pendingSince = -1f; // any reply — even one we fail to parse below — cancels the pending timer
                 if (pkg == null || pkg.Size() == 0) return;
 
@@ -938,7 +963,7 @@ namespace WhereTheCrowFlies.Patches
             if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
 
             _pendingSince = -1f;
-            Print(_pendingContext, "No answer from the server — title picking needs TheRavensCall 1.7.0 or newer.");
+            Print(_pendingContext, "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.");
         }
 
         public static List<string> GetTabOptions()
