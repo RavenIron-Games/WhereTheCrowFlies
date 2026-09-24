@@ -2,6 +2,19 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
+## [1.2.1] - TBD
+
+### Changed
+- **The DLL no longer carries the build machine's folder path.** Every build through 1.2.0 embedded the absolute
+  path of its debug-symbols file, including the Windows user folder it was built in. The build now maps its source
+  folder to a neutral `/_/` path, so the DLL names no folder on the build machine, and a build of the same commit
+  comes out byte-identical in any git clone (Windows, Git's default line endings, same .NET SDK). Build-only change:
+  the code is the same as 1.2.0 and the DLL is the same size.
+
+### Compatibility
+- No gameplay or wire change. Pairs with the same servers as 1.2.0: **TheRavensCall 1.7.0+** for `/title` and the
+  title panel, **TheRavensCall 1.2.2+** for everything else.
+
 ## [1.2.0] - 2026-09-23
 
 ### Added
