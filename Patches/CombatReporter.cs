@@ -1192,6 +1192,29 @@ namespace WhereTheCrowFlies.Patches
         }
     }
 
+    // Damage is counted in two places, one per side of the hit (review
+    // 2026-09-24). Character.Damage does NOT run on the target's ZDO owner:
+    // it runs on the machine that produced the hit (Attack.DoMeleeAttack,
+    // Aoe and Projectile all call it on the attacker's client), sets the weak
+    // spot and forwards the hit to the owner as RPC_Damage. The owner then
+    // applies armor, resistances, the block, the difficulty scale and the
+    // PvP/dodge/dead rejections, and ApplyDamage takes the health off.
+    // The old single prefix on Character.Damage gated on IsOwner(), so it only
+    // counted hits where the attacker also owned the target: PvP was always 0,
+    // and in a group most creature damage (dealt and taken) was lost.
+    //
+    //  - Dealt: Character.Damage on the attacker's own client, for hits whose
+    //    attacker is the local player. This is the damage the hit carries
+    //    before the target's armor and resistances (the attacker's machine
+    //    cannot see those); hits the owner would reject outright (a dead
+    //    target, a player with PvP off) are left out.
+    //  - Taken: Character.ApplyDamage on the local player's own client (a
+    //    player always owns their own character), i.e. after armor, the block
+    //    and the rest, and including burning/poison ticks.
+    //
+    // Every batch is a self-report: TheRavensCall only credits a batch whose
+    // name is the sending peer's own character (VerifySelf), so neither side
+    // may count damage for anyone but the local player.
     [HarmonyPatch(typeof(Character), nameof(Character.Damage))]
     internal static class Patch_Damage
     {
@@ -1200,48 +1223,25 @@ namespace WhereTheCrowFlies.Patches
             try
             {
                 if (!Plugin.EnableReporting.Value || hit == null || __instance == null) return;
-                if (!__instance.IsOwner()) return;
+                var local = Player.m_localPlayer;
+                if (local == null || __instance == local) return;
 
                 var attacker = hit.GetAttacker();
+                if (attacker == null || attacker != local) return;
+
+                // Hits the owner's RPC_Damage throws away without applying.
+                if (__instance.IsDead() || __instance.GetHealth() <= 0f) return;
+                bool victimIsPlayer = __instance is Player;
+                if (victimIsPlayer && !hit.m_ignorePVP && !__instance.IsPVPEnabled()) return;
+
                 float totalDamage = hit.GetTotalDamage();
                 if (totalDamage <= 0f) return;
 
-                // Dealt by local player
-                if (attacker is Player playerAttacker)
-                {
-                    string attName = playerAttacker.GetPlayerName();
-                    if (__instance is Player)
-                    {
-                        // PvP damage dealt
-                        TelemetryAccumulator.AddCombatDamage(attName, 0f, totalDamage, 0f, 0f, 0f);
-                    }
-                    else
-                    {
-                        // PvE damage dealt to creature
-                        TelemetryAccumulator.AddCombatDamage(attName, totalDamage, 0f, 0f, 0f, 0f);
-                    }
-                }
-
-                // Taken by local victim
-                if (__instance is Player victimPlayer)
-                {
-                    string vicName = victimPlayer.GetPlayerName();
-                    if (attacker is Player)
-                    {
-                        // PvP damage taken
-                        TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, 0f, totalDamage, 0f);
-                    }
-                    else if (attacker != null)
-                    {
-                        // PvE damage taken from monster
-                        TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, totalDamage, 0f, 0f);
-                    }
-                    else
-                    {
-                        // Environmental damage taken
-                        TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, 0f, 0f, totalDamage);
-                    }
-                }
+                string attName = local.GetPlayerName();
+                if (victimIsPlayer)
+                    TelemetryAccumulator.AddCombatDamage(attName, 0f, totalDamage, 0f, 0f, 0f); // PvP dealt
+                else
+                    TelemetryAccumulator.AddCombatDamage(attName, totalDamage, 0f, 0f, 0f, 0f); // PvE dealt
             }
             catch (Exception ex)
             {
@@ -1250,21 +1250,119 @@ namespace WhereTheCrowFlies.Patches
         }
     }
 
-    [HarmonyPatch(typeof(Humanoid), "BlockAttack")]
-    internal static class Patch_BlockAttack
+    // Remembers which routed peer sent the hit RPC_Damage is applying right
+    // now, so Patch_ApplyDamage can tell a hit the server's own process
+    // produced. On a listen host that is the host player's swings and every
+    // creature the host owns; TheRavensCall's own Character.Damage patch
+    // already credits the victim's damage taken for those (Saga.cs
+    // Patch_Damage, server process only), so counting them here too would
+    // double them. A dedicated server produces no such hits in practice, and
+    // the same rule is still right if it ever does.
+    [HarmonyPatch(typeof(Character), "RPC_Damage")]
+    internal static class Patch_RPCDamageSender
     {
-        private static void Postfix(Humanoid __instance, HitData hit, Character attacker, bool __result)
+        private static HitData _currentHit;
+        private static long _currentSender;
+
+        private static void Prefix(long sender, HitData hit)
+        {
+            _currentHit = hit;
+            _currentSender = sender;
+        }
+
+        private static Exception Finalizer(Exception __exception)
+        {
+            _currentHit = null;
+            _currentSender = 0L;
+            return __exception;
+        }
+
+        internal static bool FromServerProcess(HitData hit)
+        {
+            if (hit == null || !ReferenceEquals(hit, _currentHit)) return false;
+            if (ZNet.instance == null || ZNet.instance.IsServer()) return false;
+            long serverPeer = ZNet.instance.GetServerPeer()?.m_uid ?? 0L;
+            return serverPeer != 0L && _currentSender == serverPeer;
+        }
+    }
+
+    [HarmonyPatch(typeof(Character), nameof(Character.ApplyDamage))]
+    internal static class Patch_ApplyDamage
+    {
+        // ApplyDamage returns early without a word (dead, teleporting, in a
+        // cutscene, 0.1 damage or less). It stores the hit in m_lastHit only
+        // once it really takes the health off, so "m_lastHit became this hit"
+        // is the signal that the damage landed.
+        private static void Prefix(Character __instance, HitData hit, out bool __state)
+        {
+            __state = false;
+            try
+            {
+                if (!Plugin.EnableReporting.Value || hit == null || __instance == null) return;
+                if (__instance != Player.m_localPlayer) return;
+                __state = !ReferenceEquals(__instance.m_lastHit, hit);
+            }
+            catch { }
+        }
+
+        private static void Postfix(Character __instance, HitData hit, bool __state)
         {
             try
             {
-                if (!Plugin.EnableReporting.Value || !__result) return;
+                if (!__state || !ReferenceEquals(__instance.m_lastHit, hit)) return;
+                if (!(__instance is Player victim)) return;
+                if (Patch_RPCDamageSender.FromServerProcess(hit)) return;
+
+                float taken = hit.GetTotalDamage(); // after armor, block, resistances and the damage-taken rate
+                if (taken <= 0f) return;
+
+                string vicName = victim.GetPlayerName();
+                var attacker = hit.GetAttacker();
+                if (attacker is Player)
+                    TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, 0f, taken, 0f); // PvP taken
+                else if (attacker != null)
+                    TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, taken, 0f, 0f); // from a creature
+                else
+                    TelemetryAccumulator.AddCombatDamage(vicName, 0f, 0f, 0f, 0f, taken); // environment, burning/poison ticks
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log?.LogWarning($"[WhereTheCrowFlies] Damage taken report failed: {ex.Message}");
+            }
+        }
+    }
+
+    // BlockAttack runs on the blocker's own client (inside the owner's
+    // RPC_Damage). It applies the shield's damage modifiers and then
+    // hit.BlockDamage(blocked), which scales the hit DOWN in place, so reading
+    // the hit in the postfix gives the damage that got through, not what was
+    // blocked (review 2026-09-24). The prefix keeps the blockable damage
+    // before the block; the difference is what the block stopped. It also
+    // returns true when the guard breaks (out of stamina or staggered) and
+    // BlockDamage is skipped; such a hit stops nothing and is not a block.
+    [HarmonyPatch(typeof(Humanoid), "BlockAttack")]
+    internal static class Patch_BlockAttack
+    {
+        private static void Prefix(HitData hit, out float __state)
+        {
+            __state = -1f;
+            try { if (hit != null) __state = hit.GetTotalBlockableDamage(); } catch { }
+        }
+
+        private static void Postfix(Humanoid __instance, HitData hit, bool __result, float __state)
+        {
+            try
+            {
+                if (!Plugin.EnableReporting.Value || !__result || __state < 0f) return;
                 if (!(__instance is Player player) || player != Player.m_localPlayer) return;
 
                 var blocker = player.GetCurrentBlocker();
                 if (blocker == null || hit == null) return;
 
+                float blockedDamage = __state - hit.GetTotalBlockableDamage();
+                if (blockedDamage <= 0f) return; // guard broken: nothing was stopped
+
                 bool isParry = blocker.m_shared.m_timedBlockBonus > 1f && player.m_blockTimer != -1f && player.m_blockTimer < 0.25f;
-                float blockedDamage = hit.GetTotalBlockableDamage();
 
                 TelemetryAccumulator.AddBlockDefense(player.GetPlayerName(), isParry, blockedDamage);
             }
@@ -1555,17 +1653,26 @@ namespace WhereTheCrowFlies.Patches
 
     #region Harmony Patches: World Events (Boss Summons, Portals, Guardian Powers)
 
-    [HarmonyPatch(typeof(OfferingBowl), "InitiateSpawnBoss")]
+    // InitiateSpawnBoss only ASKS the altar's owner to spawn (RPC_SpawnBoss);
+    // the owner refuses when a spawn is already queued or there is no room,
+    // and a client that does not own the altar cannot see the queue, so each
+    // repeat press during the spawn delay used to count another summon
+    // (review 2026-09-24). The owner answers the requester with
+    // RPC_BossSpawnInitiated only after SpawnBoss really started, so that is
+    // the one summon to report. m_interactUser is set by Interact/UseItem on
+    // the requester's own machine just before the request.
+    [HarmonyPatch(typeof(OfferingBowl), "RPC_BossSpawnInitiated")]
     internal static class Patch_OfferingBowl
     {
-        private static void Prefix(OfferingBowl __instance, Vector3 point, bool removeItemsFromInventory)
+        private static void Prefix(OfferingBowl __instance)
         {
             try
             {
                 if (!Plugin.EnableReporting.Value || __instance == null) return;
                 var player = Player.m_localPlayer;
-                if (player == null) return;
+                if (player == null || __instance.m_interactUser != player) return;
 
+                Vector3 point = __instance.transform.position;
                 string bossName = __instance.m_bossPrefab != null ? TelemetrySender.CleanName(__instance.m_bossPrefab.name) : "UnknownBoss";
                 string biome = TelemetrySender.GetBiomeName(point);
 
