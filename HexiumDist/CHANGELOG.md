@@ -9,15 +9,16 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   attacker's machine and applied on the machine that owns the target, but the damage report only counted a hit
   when both were the same machine. Playing alone that is always true; in a group, any creature another player
   "owned" (usually whoever reached the area first) dropped out of your damage dealt and taken, and damage between
-  players never counted at all. Now your damage dealt is counted on your own machine for every hit you land, and
+  players never counted at all. Now your damage dealt is counted on your own machine for every hit you make, and
   your damage taken is counted on your own machine for every hit that lands on you.
-- **Damage taken is now what you actually lost**, after armor, resistances, blocking and the world's difficulty
+- **Damage taken is now the damage that reached you**, after armor, resistances, blocking and the world's difficulty
   settings, and it includes burning and poison ticks. Hits you dodge, or that the game rejects (PvP off), no longer
   count. Damage dealt is still the hit's damage before the target's armor and resistances, which your machine
   can't see; hits on a target that is already dead, or on a player with PvP off, no longer count.
 - **Damage blocked reported the damage that got through the block, not the damage it stopped.** A clean parry of a
   big hit read close to 0, and a weak block read high. It now reports what the block actually stopped, and a block
-  that breaks (out of stamina or staggered) no longer counts as a block.
+  that breaks (out of stamina or staggered) no longer counts as a block (unless the shield itself reduces
+  that kind of damage; that reduction still counts as blocked).
 - **A boss summon could be counted more than once.** Pressing the altar again while the boss was still on its way
   (when another player's game was running the altar's area), or a summon that failed for lack of room, each
   counted as a summon. A summon is now counted once, when the boss spawn has really started.
@@ -26,14 +27,14 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **The DLL no longer carries the build machine's folder path.** Every build through 1.2.0 embedded the absolute
   path of its debug-symbols file, including the Windows user folder it was built in. The build now maps its source
   folder to a neutral `/_/` path, so the DLL names no folder on the build machine, and a build of the same commit
-  comes out byte-identical in any git clone (Windows, Git's default line endings, same .NET SDK).
+  comes out byte-identical in any clone of the GitHub repository (Windows, Git's default line endings, same .NET SDK).
 
 ### Compatibility
 - No wire change: the same reports with the same fields, so no server update is needed. Pairs with the same
   servers as 1.2.0: **TheRavensCall 1.7.0+** for `/title` and the title panel, **TheRavensCall 1.2.2+** for
   everything else.
-- Damage counts on your server's dashboard will be higher than before in group play. That is the damage that was
-  missing, not a change in how it is scored.
+- Damage dealt and taken will be higher than before in group play: that is the damage that was missing. Damage
+  taken for the same fight will be lower than before, because it is now counted after armor and blocking.
 
 ## [1.2.0] - 2026-09-23
 

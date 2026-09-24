@@ -20,7 +20,7 @@
 
 ### 1.1 Why Client-Authoritative Reporting Is Mandatory in Valheim
 In Valheim's multiplayer networking model, the dedicated server acts primarily as a world state relay and persistent storage container. Simulation authority for physics, character combat, damage calculation, creature deaths, piece construction, foraging, and player statistics is delegated to the **client that owns the local sector / object ZDO (Zone Data Object)**:
-- `Character.OnDeath` and `Humanoid.BlockAttack` (inside `Character.RPC_Damage` → `ApplyDamage`) execute on the ZDO owner client.
+- `Character.OnDeath` and `Humanoid.BlockAttack` (called by `Character.RPC_Damage` before `ApplyDamage`) execute on the ZDO owner client.
 - `Character.Damage` does **not**: it runs on the machine that produced the hit (the attacker's client for melee, AoE and projectiles) and only forwards the hit to the owner as `RPC_Damage`. Since 1.3.0, damage dealt is counted in `Character.Damage` when the local player is the attacker, and damage taken in `Character.ApplyDamage` on the local player's own client (after armor and block). Hits whose `RPC_Damage` came from the server's own process are not counted as taken, because TheRavensCall's own `Character.Damage` patch credits those on a listen host.
 - `Player.PlacePiece`, `InventoryGui.DoCrafting`, `Player.ConsumeItem`, `Pickable.RPC_Pick`, and `PlayerProfile.IncrementStat` execute exclusively on the local player client.
 - The dedicated server **never** receives vanilla RPCs or internal events for combat damage values, mob kills, parries, crafted items, or player statistics.

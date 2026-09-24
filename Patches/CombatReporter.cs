@@ -1264,16 +1264,23 @@ namespace WhereTheCrowFlies.Patches
         private static HitData _currentHit;
         private static long _currentSender;
 
-        private static void Prefix(long sender, HitData hit)
+        // RPC_Damage can nest: a block-charge shield's BlockAttack starts an
+        // attack whose Character.Damage on a creature this machine owns runs
+        // that creature's RPC_Damage synchronously, inside the outer one. So
+        // the prefix saves the outer slot and the finalizer puts it back,
+        // instead of clearing it, or the outer ApplyDamage would lose its
+        // sender (fix review 2026-09-24).
+        private static void Prefix(long sender, HitData hit, out KeyValuePair<HitData, long> __state)
         {
+            __state = new KeyValuePair<HitData, long>(_currentHit, _currentSender);
             _currentHit = hit;
             _currentSender = sender;
         }
 
-        private static Exception Finalizer(Exception __exception)
+        private static Exception Finalizer(Exception __exception, KeyValuePair<HitData, long> __state)
         {
-            _currentHit = null;
-            _currentSender = 0L;
+            _currentHit = __state.Key;
+            _currentSender = __state.Value;
             return __exception;
         }
 
