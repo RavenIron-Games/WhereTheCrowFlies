@@ -18,7 +18,7 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **`RavensCall_TitleSync_V1`**: a new server → everybody routed RPC that this mod receives (schema 1: a count, then a
   player name and that player's active title per entry, `""` = no title). It is accepted only from the server, and
   every title is cleaned before it reaches a nameplate: no rich-text tags, no `$` localisation keys, no control
-  characters or backslashes, 64 characters at most. See `HANDOFF.md` §2.3b.
+  characters, line or paragraph separators, or backslashes, 64 characters at most. See `HANDOFF.md` §2.3b.
 
 ### Fixed
 - **Damage in multiplayer was mostly missing, and PvP damage was always zero.** A hit is worked out on the

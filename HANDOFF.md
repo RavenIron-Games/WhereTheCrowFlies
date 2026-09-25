@@ -399,7 +399,7 @@ passes between the two mods; they share only this seam.
 
 **Known limit.** Keyed by name, because TheRavensCall keys its records by name and its join hook runs before the
 character exists. A player who joins under a name that TheRavensCall has bound to another account ("untrusted" in
-1.8.0) can show that name's title too (when the player who owns the name is or was online in the same session); the
+1.8.0) can show that name's title too (when the player who owns the name is or was online in the same session, or an admin changed that name's title with `ravenscall title` during it); the
 plate already shows the name itself, so the title adds nothing new.
 
 Not run in a game yet: it needs a TheRavensCall 1.8.0 server and two players on 1.3.0 (you never see your own plate),
