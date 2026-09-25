@@ -38,6 +38,13 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **A boss summon could be counted more than once.** Pressing the altar again while the boss was still on its way
   (when another player's game was running the altar's area), or a summon that failed for lack of room, each
   counted as a summon. A summon is now counted once, when the boss spawn has really started.
+- **The player hosting the world was left out.** On a world you host yourself (a listen server, or a single-player
+  world with TheRavensCall installed), `/title` and the title panel only said to join a server, and TheRavensCall
+  never counted what this mod reported about you. With **TheRavensCall 1.8.0+** installed on the hosting game it now
+  does, as for any other player (damage, blocks, building, crafting, harvesting, food, rituals, stats and skills
+  among them), and `/title` and the title panel work for you. Without TheRavensCall on the host nothing answers,
+  and after 5 seconds the hint says what the host needs. A dedicated server is unchanged: this mod never reports
+  from one.
 
 ### Changed
 - **The DLL no longer carries the build machine's folder path.** Every build through 1.2.0 embedded the absolute
@@ -52,6 +59,8 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   The one wire addition is the `RavensCall_TitleSync_V1` receiver above. Pairs with **TheRavensCall 1.8.0+** for
   titles on nameplates, **TheRavensCall 1.7.0+** for `/title` and the title panel, **TheRavensCall 1.2.2+** for
   everything else. An older TheRavensCall never sends the new packet, so no TheRavensCall title line shows.
+- On a world you host yourself, your own reports, `/title` and the title panel need **TheRavensCall 1.8.0+**
+  installed on the hosting game; an older one ignores them, as before.
 - Titles are matched by character name, the way TheRavensCall keeps them: two characters with the same name show
   the same title.
 - Damage dealt and taken will be higher than before in group play: that is the damage that was missing. Damage

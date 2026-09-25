@@ -194,7 +194,11 @@ namespace WhereTheCrowFlies.Patches
                     string label = isActive ? title + " ✓" : title;
                     if (GUILayout.Button(label, isActive ? GiltFrameTheme.Primary : GiltFrameTheme.Button) && !isActive)
                     {
-                        if (TitlePicker.Send(TitleOp.Set, title, _context)) _status = "Asking the server…";
+                        // Status first: on a listen host the reply lands inside
+                        // Send (OnReply), and a failed Send puts its own line
+                        // here (OnLocal); neither may be overwritten after.
+                        _status = "Asking the server…";
+                        TitlePicker.Send(TitleOp.Set, title, _context);
                     }
                 }
                 GUILayout.EndScrollView();
@@ -203,7 +207,8 @@ namespace WhereTheCrowFlies.Patches
                 GUI.enabled = _active != "";
                 if (GUILayout.Button("No title", GiltFrameTheme.Button))
                 {
-                    if (TitlePicker.Send(TitleOp.Clear, "", _context)) _status = "Asking the server…";
+                    _status = "Asking the server…"; // before Send, as above
+                    TitlePicker.Send(TitleOp.Clear, "", _context);
                 }
                 GUI.enabled = true;
             }

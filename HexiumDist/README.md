@@ -20,6 +20,8 @@
 
 In Valheim's peer-to-peer multiplayer simulation model, combat calculations, creature deaths, damage, parries, building, crafting, foraging, and fishing are simulated locally on the client that owns the local zone or character. **WhereTheCrowFlies** acts as the client-side scout—observing all gameplay events with zero client lag and securely reporting them back to dedicated servers running **TheRavensCall** via routed RPC.
 
+**Hosting the world yourself?** On a listen server, or a single-player world, the game you play in is also the server. Install **TheRavensCall 1.8.0+** in that same game and your own play counts too, and `/title` works for you as the host. Without TheRavensCall there, nothing is recorded for you and nothing breaks.
+
 ---
 
 ## ⚙️ Features
@@ -98,6 +100,9 @@ The server decides which titles you've actually earned; this mod only sends the 
 the panel) whatever TheRavensCall answers. Against an older TheRavensCall, a server with `AcceptClientReports`
 turned off, or no TheRavensCall at all, nothing answers and you'll see a one-time hint after a few seconds that
 names both possible causes — everything else in this mod keeps working normally.
+
+On a world you host yourself (a listen server, or single player), both work too when your game also runs
+**TheRavensCall 1.8.0+**; without it, nothing answers and the hint after a few seconds says what the host needs.
 
 **Vendored, and not ours:** the panel's gilt frame is Wubarrk's VikingOS shared source (`Libs/SharedUI/GiltFrameTheme.cs`,
 MIT), compiled in unchanged.

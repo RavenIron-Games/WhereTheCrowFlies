@@ -21,7 +21,7 @@
 ### 1.1 Why Client-Authoritative Reporting Is Mandatory in Valheim
 In Valheim's multiplayer networking model, the dedicated server acts primarily as a world state relay and persistent storage container. Simulation authority for physics, character combat, damage calculation, creature deaths, piece construction, foraging, and player statistics is delegated to the **client that owns the local sector / object ZDO (Zone Data Object)**:
 - `Character.OnDeath` and `Humanoid.BlockAttack` (called by `Character.RPC_Damage` before `ApplyDamage`) execute on the ZDO owner client.
-- `Character.Damage` does **not**: it runs on the machine that produced the hit (the attacker's client for melee, AoE and projectiles) and only forwards the hit to the owner as `RPC_Damage`. Since 1.3.0, damage dealt is counted in `Character.Damage` when the local player is the attacker, and damage taken in `Character.ApplyDamage` on the local player's own client (after armor and block). Hits whose `RPC_Damage` came from the server's own process are not counted as taken, because TheRavensCall's own `Character.Damage` patch credits those on a listen host.
+- `Character.Damage` does **not**: it runs on the machine that produced the hit (the attacker's client for melee, AoE and projectiles) and only forwards the hit to the owner as `RPC_Damage`. Since 1.3.0, damage dealt is counted in `Character.Damage` when the local player is the attacker, and damage taken in `Character.ApplyDamage` on the local player's own client (after armor and block). Hits whose `RPC_Damage` came from the server's own process are not counted as taken, because TheRavensCall's own `Character.Damage` patch credits those on a listen host. On the listen host itself (§1.4) no hit is left out: TheRavensCall 1.8.0 stops crediting the host player's own damage from that patch once the host's WhereTheCrowFlies has reported.
 - `Player.PlacePiece`, `InventoryGui.DoCrafting`, `Player.ConsumeItem`, `Pickable.RPC_Pick`, and `PlayerProfile.IncrementStat` execute exclusively on the local player client.
 - The dedicated server **never** receives vanilla RPCs or internal events for combat damage values, mob kills, parries, crafted items, or player statistics.
 
@@ -31,6 +31,16 @@ In Valheim's multiplayer networking model, the dedicated server acts primarily a
 
 ### 1.3 Safe Everywhere & Silent No-Op
 `ZRoutedRpc` dispatch in Valheim to an unregistered method name is a silent no-op. When a player with `WhereTheCrowFlies` connects to a vanilla server or a community server without `TheRavensCall`, packets are discarded by the engine with zero network errors, zero disconnects, and zero log noise.
+
+### 1.4 Listen host (1.3.0)
+A listen host is the game running the world with a player of its own: `ZNet.instance.IsServer() && !ZNet.instance.IsDedicated() && Player.m_localPlayer != null` (`TelemetrySender.IsListenHost`). A single-player world is the same case with nobody else on. Since 1.3.0 its player is reported like any other, over the same routed RPCs:
+- **The gate.** Every sender and `TitlePicker.Send` go through `TelemetrySender.IsConnected()`. On a server process `ZNet.GetConnectionStatus()` returns `Connected` unconditionally (decomp/ZNet.cs:2954-2958), so the server case is decided on its own: a listen host reports, a dedicated server never does (no local player; `IsDedicated()` is `false` only in the client build, decomp/ZNet.cs:2445-2448). A pure client reports once `GetConnectionStatus() == Connected`, as before. Through 1.2.x a listen host already sent its telemetry (that status check passed there) but `TitlePicker.Send` refused on any server, and TheRavensCall up to 1.7.x dropped every report about the host player (the host is not one of its peers).
+- **Transport.** The no-target `InvokeRoutedRPC(method, pkg)` targets `GetServerPeerID()`, which on a server is the routed instance's own id (decomp/ZRoutedRpc.cs:102-118), so the handler runs in this same process and nothing goes on the network (:130-137); the sender it sees is that id, `ZNet.GetUID()` (decomp/ZNet.cs:396, :2163-2165). TheRavensCall 1.8.0+ takes such a local report as the host's own. Without TheRavensCall there is no handler and `HandleRoutedRPC` drops it without a word (decomp/ZRoutedRpc.cs:189-197).
+- **Replies.** TheRavensCall answers the host's `/title` by sending `RavensCall_TitleReply_V1` to the host's uid, and broadcasts `RavensCall_TitleSync_V1` to everybody; both run locally with sender `ZNet.GetUID()`. Both handlers use one accept rule, `NameplateTitles.FromServer` (§2.3b).
+- **No double count.** TheRavensCall's in-process `Character.Damage` patch sees every hit the host's process produces (the host player's own swings, and hits on the host from creatures the host owns or from a fall), and `CreditDamage` has no dedup. TheRavensCall 1.8.0 therefore stops crediting the host's own player from that patch once the host's WhereTheCrowFlies has reported in the world session (its first report is the spawn snapshot), and the host's damage comes from this mod's batches alone. So on a listen host this mod counts every hit of the host's, like any client: `Patch_Damage` counts all damage dealt, and `Patch_RPCDamageSender.FromServerProcess` is `false` on a server process, so nothing taken is left out (on a pure client it still leaves out the hits the server's process produced, which that patch credits). Kills, deaths and fish that TheRavensCall's own hooks also see on the host are collapsed by its `CombatEventDedup` (same name, prefab and position this mod sends).
+- **`/title` without an answer.** If nothing answers within 5 seconds, the hint on a server process names TheRavensCall 1.8.0+ ("No answer — a world you host needs TheRavensCall 1.8.0 or newer installed, with AcceptClientReports enabled."); on a pure client it is unchanged.
+
+Not run in a game yet: it needs a listen host running TheRavensCall 1.8.0 and this mod 1.3.0.
 
 ---
 
@@ -296,8 +306,9 @@ Dodge=108, Ride=110`.
 Sent by the player's own `/title` (chat) or `title` (F5 console) command, and by the title panel (§2.3a) — on
 open (op 1) and on every click (ops 2/3) — see the README's "Picking your title" section. Not tied to any Harmony
 hook; the player (or their click on the panel) triggers it directly. Requires **TheRavensCall 1.7.0+** to get an
-answer (see §2.3 `RavensCall_TitleReply_V1` below); an older server drops it like any other unknown event type
-(one "unknown eventType 13" log line, only with `LogCombatReports` on).
+answer (see §2.3 `RavensCall_TitleReply_V1` below), **1.8.0+** for the host player of a listen server (§1.4); an
+older server drops it like any other unknown event type (one "unknown eventType 13" log line, only with
+`LogCombatReports` on).
 
 | Field # | Name | Type | Description / Notes |
 |---|---|---|---|
@@ -317,8 +328,10 @@ same lifecycle point TheRavensCall registers its own listeners at (`ZRoutedRpc.i
 **only to the requesting peer**, never broadcast, and this mod prints the text straight into whichever Terminal
 (chat box or F5 console) the `title` command was typed in, prefixed `[WhereTheCrowFlies]`. A player who sends a
 request and gets no reply within 5 seconds sees a one-time local hint instead ("No answer from the server — it needs
-TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.") — this mod does not retry the request. The handler
-accepts the packet only from the server peer's uid; it never does anything but print the text and, since 1.2.0,
+TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled."; on a listen host it names 1.8.0, §1.4) — this mod
+does not retry the request. The handler accepts the packet only from the server: the server peer's uid on a pure
+client, `ZNet.GetUID()` on a listen host, where the reply runs locally (since 1.3.0 it shares
+`NameplateTitles.FromServer` with §2.3b); it never does anything but print the text and, since 1.2.0,
 hand the parsed list to the `title` command's tab completion and to the title panel (below), so both stay fresh with
 no second round trip.
 

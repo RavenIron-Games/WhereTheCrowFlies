@@ -93,11 +93,39 @@ namespace WhereTheCrowFlies.Patches
         // TitlePicker can both reference the one literal.
         internal const string RpcNameTitleReply = "RavensCall_TitleReply_V1";
 
-        private static bool IsConnected()
+        // The one "may this report go out" gate, for every sender below and
+        // for TitlePicker.Send. A server process reads Connected no matter
+        // what (GetConnectionStatus returns Connected whenever IsServer(),
+        // decomp/ZNet.cs:2954-2958), so the server case is decided on its
+        // own: a listen host reports its own player, a dedicated server
+        // never reports (it has no player of its own). A pure client reports
+        // once it is connected, as before.
+        internal static bool IsConnected()
+        {
+            if (ZNet.instance == null || ZRoutedRpc.instance == null) return false;
+            if (ZNet.instance.IsServer()) return IsListenHost();
+            return ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected;
+        }
+
+        // A listen host (1.3.0): the game running the world with a player of
+        // its own. A single-player world is the same case with nobody else
+        // on. Its reports use the same routed RPCs with the no-target
+        // overload, which on a server targets the routed instance's own id
+        // (GetServerPeerID returns m_id, decomp/ZRoutedRpc.cs:107-112) and
+        // so runs the handler in this process and sends nothing on the
+        // network (:130-137). TheRavensCall 1.8.0+ installed on the host
+        // takes such a report as the host's own. Without TheRavensCall
+        // there is no handler, and HandleRoutedRPC drops the call without a
+        // word (:189-197), so nothing breaks. A dedicated server fails both
+        // of the last two checks: IsDedicated() is false only in the game
+        // client's build (decomp/ZNet.cs:2445-2448 is that build), and a
+        // headless server never spawns a local player.
+        internal static bool IsListenHost()
         {
             return ZNet.instance != null &&
-                   ZRoutedRpc.instance != null &&
-                   ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected;
+                   ZNet.instance.IsServer() &&
+                   !ZNet.instance.IsDedicated() &&
+                   Player.m_localPlayer != null;
         }
 
         public static string GetBiomeName(Vector3 pos)
@@ -926,18 +954,26 @@ namespace WhereTheCrowFlies.Patches
         {
             _pendingContext = context;
 
-            if (ZNet.instance == null || ZNet.GetConnectionStatus() != ZNet.ConnectionStatus.Connected || ZNet.instance.IsServer())
+            if (!TelemetrySender.IsConnected())
             {
-                // Covers both "not connected yet" and singleplayer/listen-host,
-                // where there is no separate server to hold titles.
-                const string msg = "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer.";
+                // Not in a world yet (or the host's character is not spawned
+                // right now). A world this game hosts itself (a listen server,
+                // or single player) sends like any client since 1.3.0: the
+                // request is handled in this same process, and TheRavensCall
+                // 1.8.0+ installed here answers it (see TelemetrySender.IsListenHost).
+                const string msg = "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer, or host your world with TheRavensCall 1.8.0 or newer installed.";
                 Print(context, msg);
                 if (TitlePanel.IsOpen) TitlePanel.OnLocal(msg);
                 return false;
             }
 
-            TelemetrySender.SendTitleRequest(op, title);
+            // Armed BEFORE the send: on a listen host TheRavensCall answers
+            // inside this very call (the request and the reply are both
+            // handled in this process), and that reply clears the timer.
+            // Arming it afterwards would bring the "no answer" hint 5 seconds
+            // after a reply that already came.
             _pendingSince = Time.realtimeSinceStartup;
+            TelemetrySender.SendTitleRequest(op, title);
             return true;
         }
 
@@ -978,10 +1014,16 @@ namespace WhereTheCrowFlies.Patches
                 // another player's client with a forged reply. Only accept this
                 // packet from the server itself, checked before anything else so
                 // a spoofed packet cannot even suppress the real timeout (review
-                // 2026-09-22). The server's routed id is ZDOMan.GetSessionID(),
-                // the same value it sends as its uid in PeerInfo, so
-                // GetServerPeer().m_uid is the right thing to compare against
-                // (decomp/ZNet.cs Awake + SendPeerInfo). Vanilla routing does
+                // 2026-09-22). The rule is NameplateTitles.FromServer, shared
+                // with the title sync: on a pure client the server's routed id
+                // is ZDOMan.GetSessionID(), the same value it sends as its uid
+                // in PeerInfo, so GetServerPeer().m_uid is the right thing to
+                // compare against (decomp/ZNet.cs Awake + SendPeerInfo). On a
+                // listen host (1.3.0) the reply is TheRavensCall's, in this
+                // same process: sent to the host's own uid, it is handled
+                // locally with sender == ZNet.GetUID() (decomp/ZRoutedRpc.cs
+                // :123-132), and GetServerPeer() is null on a server
+                // (decomp/ZNet.cs:3005-3009). Vanilla routing does
                 // carry m_senderPeerID inside the packet and relays it unchanged,
                 // so a peer that hand-crafts the whole RoutedRPCData can still
                 // claim the server's id; all that buys is one printed line under
@@ -989,10 +1031,7 @@ namespace WhereTheCrowFlies.Patches
                 // handler only prints the line and repaints the player's own title
                 // panel / tab-completion list — it never writes game state or sends
                 // anything back.
-                long serverPeer = (ZNet.instance != null && !ZNet.instance.IsServer())
-                    ? (ZNet.instance.GetServerPeer()?.m_uid ?? 0L)
-                    : 0L;
-                if (serverPeer == 0L || sender != serverPeer) return;
+                if (!NameplateTitles.FromServer(sender)) return;
 
                 _pendingSince = -1f; // any reply — even one we fail to parse below — cancels the pending timer
                 if (pkg == null || pkg.Size() == 0)
@@ -1052,7 +1091,13 @@ namespace WhereTheCrowFlies.Patches
                 if (Time.realtimeSinceStartup - _pendingSince < ReplyTimeoutSeconds) return;
 
                 _pendingSince = -1f;
-                const string hint = "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.";
+                // On a world this game hosts, the answer would come from this
+                // same process, and only TheRavensCall 1.8.0+ answers its host
+                // (1.7.x ignores a request that no connection delivered).
+                bool hosting = ZNet.instance != null && ZNet.instance.IsServer();
+                string hint = hosting
+                    ? "No answer — a world you host needs TheRavensCall 1.8.0 or newer installed, with AcceptClientReports enabled."
+                    : "No answer from the server — it needs TheRavensCall 1.7.0 or newer, with AcceptClientReports enabled.";
                 Print(_pendingContext, hint);
                 if (TitlePanel.IsOpen) TitlePanel.OnLocal(hint);
             }
@@ -1215,6 +1260,10 @@ namespace WhereTheCrowFlies.Patches
     // Every batch is a self-report: TheRavensCall only credits a batch whose
     // name is the sending peer's own character (VerifySelf), so neither side
     // may count damage for anyone but the local player.
+    //
+    // On a listen host (1.3.0) both sides count every hit of the host
+    // player's own, the same as for any client (see Patch_RPCDamageSender
+    // for why nothing is left out there).
     [HarmonyPatch(typeof(Character), nameof(Character.Damage))]
     internal static class Patch_Damage
     {
@@ -1258,6 +1307,18 @@ namespace WhereTheCrowFlies.Patches
     // Patch_Damage, server process only), so counting them here too would
     // double them. A dedicated server produces no such hits in practice, and
     // the same rule is still right if it ever does.
+    //
+    // On the listen host itself (1.3.0) this is false for every hit, on
+    // purpose. There the hits the host's process produces arrive with
+    // sender == ZNet.GetUID() (Character.Damage -> ZNetView.InvokeRPC to the
+    // owner, handled locally: decomp/Character.cs:2232-2239,
+    // ZNetView.cs:331-334, ZRoutedRpc.cs:120-133), but TheRavensCall 1.8.0
+    // does not credit the host's own player from its Character.Damage patch
+    // once the host's WhereTheCrowFlies has reported in that world session
+    // (Saga.cs Patch_Damage): the host's damage dealt and taken then comes
+    // from this mod's batches alone, every hit counted as on any client.
+    // Leaving the host's own hits out here too would lose them.
+    // Without a report from this mod the patch stays the host's only source.
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Patch_RPCDamageSender
     {
@@ -1287,7 +1348,7 @@ namespace WhereTheCrowFlies.Patches
         internal static bool FromServerProcess(HitData hit)
         {
             if (hit == null || !ReferenceEquals(hit, _currentHit)) return false;
-            if (ZNet.instance == null || ZNet.instance.IsServer()) return false;
+            if (ZNet.instance == null || ZNet.instance.IsServer()) return false; // listen host: see the class comment
             long serverPeer = ZNet.instance.GetServerPeer()?.m_uid ?? 0L;
             return serverPeer != 0L && _currentSender == serverPeer;
         }

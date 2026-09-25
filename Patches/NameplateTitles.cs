@@ -98,9 +98,9 @@ namespace WhereTheCrowFlies.Patches
             }
         }
 
-        // Only the server's own packets count, the rule
-        // TitlePicker.RPC_OnTitleReply (CombatReporter.cs) applies to the
-        // title reply: routed RPCs are relayed client-to-client by the server
+        // Only the server's own packets count; TitlePicker.RPC_OnTitleReply
+        // (CombatReporter.cs) applies this same rule to the title reply:
+        // routed RPCs are relayed client-to-client by the server
         // without checking the method name, so any modded peer could
         // otherwise write titles under other players' names on this screen.
         //  - Pure client: the server's routed id is ZDOMan.GetSessionID(), the
@@ -108,8 +108,9 @@ namespace WhereTheCrowFlies.Patches
         //    GetServerPeer().m_uid is the one to compare against
         //    (decomp/ZNet.cs SendPeerInfo, :997; the uid lands in peer.m_uid
         //    at :1197, before the routed peer is added at :1235).
-        //  - Listen host (IsServer()): the packet is the host's own
-        //    broadcast, which InvokeRoutedRPC dispatches locally with
+        //  - Listen host (IsServer()): the packet is the host's own (a
+        //    broadcast, or a reply sent to the host's own uid), which
+        //    InvokeRoutedRPC dispatches locally with
         //    m_senderPeerID = the routed instance's own id
         //    (decomp/ZRoutedRpc.cs:123-132). ZNet.Awake sets that id to
         //    ZDOMan.GetSessionID() (decomp/ZNet.cs:396), which is exactly what
@@ -117,7 +118,7 @@ namespace WhereTheCrowFlies.Patches
         // As with the title reply, a peer that hand-crafts the whole routed
         // packet can still claim the server's id; all that reaches is a line
         // of cleaned text under a nameplate on this screen.
-        private static bool FromServer(long sender)
+        internal static bool FromServer(long sender)
         {
             if (ZNet.instance == null) return false;
             if (ZNet.instance.IsServer()) return sender == ZNet.GetUID();
