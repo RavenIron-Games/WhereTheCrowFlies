@@ -353,6 +353,54 @@ in the family (ValkyriesCargo's Cargo Terminal, YggdrasilsReckoning's Anvil menu
 
 ---
 
+### 2.3b `RavensCall_TitleSync_V1` (Server → Everybody, receiver since 1.3.0)
+Players' ACTIVE titles, for the nameplate line (`Patches/NameplateTitles.cs`). This mod only receives on this name,
+never sends. **TheRavensCall 1.8.0+** sends it with `ZRoutedRpc.Everybody` (gated by its `SyncTitlesToNameplates`
+config): the whole online table every time a player joins (so the joining client gets it too), and one entry whenever
+a player's active title changes (set, clear, a first earned title activating itself, the admin's `ravenscall title`).
+Registered on its own `ZNet.Awake` postfix (`Patch_RegisterTitleSync`), a sibling of the title reply's with its own
+try/catch, which also clears the cache: a new world session starts empty and the join table refills it. Vanilla
+clients, older versions of this mod and the dedicated server itself have no handler registered and drop the packet
+silently (`ZRoutedRpc.HandleRoutedRPC` returns without a log when the method hash is unknown, decomp/ZRoutedRpc.cs).
+
+| Field # | Name | Type | Description / Notes |
+|---|---|---|---|
+| 1 | `schemaVersion` | `int` | `1`; any other value is ignored whole |
+| 2 | `count` | `int` | Entries that follow. The server sends at most 256; a count outside `0..1024` is ignored whole |
+| 3 | `playerName` | `string` | Repeated `count` times, each followed by its field 4. TheRavensCall's stored record name, matched case-insensitively against `Player.GetPlayerName()`; empty names are skipped |
+| 4 | `title` | `string` | That player's active title; `""` = none (the name is removed from the cache) |
+
+**Accept rule.** On a pure client only `sender == ZNet.instance.GetServerPeer().m_uid` is accepted (the title reply's
+rule, §2.3). On a listen host (`ZNet.instance.IsServer()`) the packet is the host's own broadcast, which
+`InvokeRoutedRPC` dispatches locally with the routed instance's own id as sender; `ZNet.Awake` sets that id to
+`ZDOMan.GetSessionID()` (decomp/ZNet.cs:396), the same value `ZNet.GetUID()` returns (decomp/ZNet.cs:2163-2165), so
+there `sender == ZNet.GetUID()` is accepted. Anything else is dropped before parsing. The whole packet is read before
+the cache changes, so a truncated one changes nothing. Every title goes through `NameplateTitles.Clean` first: control
+characters, `<` and `>` (TextMeshPro rich text), `$` (`Localization.Localize` reads `$word` as a key) and `\`
+(TextMeshPro turns `\n`, `\uXXXX` and the like into the characters themselves) are dropped, then the title is
+trimmed and capped at 64 characters. The cache holds at most 1024 names; past that only names already in it update.
+
+**Render.** A `Player.GetHoverName` postfix (`Patch_NameplateTitle`) appends
+`"\n<size=70%><color=#a8c0d8>" + title + "</color></size>"` when `ShowNameplateTitles` is on and the cache has the
+player's name: one dictionary lookup per call, and a string is built only when there is a title. `EnemyHud` rewrites
+every other nearby player's nameplate from `Localize(GetHoverName())` every frame (decomp/EnemyHud.cs:154, :200) and
+never builds the local player's own (:92), so there is nothing to refresh or tear down, and you need a second player
+to see your own title. The body swallows every exception (per-frame render path). The same text also reaches
+Humanoid's `$msg_cantuseon` message (using an item on another player), as Ragnarok's Wrath's title line already does.
+
+**Ragnarok's Wrath.** RW appends its own world-sim title to the same method (a default-priority postfix, Harmony id
+`com.raveniron.ragnarokswrath`, gold `#c9b458`). `[HarmonyBefore("com.raveniron.ragnarokswrath")]` makes ours run
+first, so the plate reads name, our title, RW's title. HarmonyX sorts postfixes with the same `PatchSorter` as every
+other patch kind, where a `HarmonyBefore` edge wins over priority, and emits them in that order
+(`HarmonyManipulator.WritePostfixes`; checked in the HarmonyX 2.9.0 build this project compiles against). No data
+passes between the two mods; they share only this seam.
+
+**Known limit.** Keyed by name, because TheRavensCall keys its records by name and its join hook runs before the
+character exists. A player who joins under a name that TheRavensCall has bound to another account ("untrusted" in
+1.8.0) shows that name's title too; the plate already shows the name itself, so the title adds nothing new.
+
+---
+
 ### 2.4 Legacy `RavensCall_CombatReport_V1` Specification
 
 For backward compatibility with legacy servers:

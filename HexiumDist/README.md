@@ -34,7 +34,8 @@ In Valheim's peer-to-peer multiplayer simulation model, combat calculations, cre
 - **World Rituals & Exploration**: Captures boss altar offerings/summons, portal traversals with tags, and Forsaken power activations.
 - **100% Vanilla PlayerStat Delta Sync**: Intercepts every vanilla `PlayerStatType` counter (~205 on Valheim 1.0) (distances traveled, jumps, arrows fired, skeleton summons, time in base, sleep, tree chops, mining hits, etc.) and synchronizes deltas to the server.
 - **Full Stat & Skill Backfill**: Broadcasts a full absolute snapshot of all ~205 stats plus every raised `Skills.SkillType` (level and progress) on spawn and on a configurable interval (default 5 minutes) — so pre-existing totals a player already earned show up immediately, not just future deltas.
-- **Out Of The Way**: No HUD changes and no performance penalty during normal play — the only interface is the optional title panel you open yourself with `/titles`.
+- **Titles On Nameplates**: On a server running TheRavensCall 1.8.0+, other players' active titles show on a line under their name (`ShowNameplateTitles`, on by default).
+- **Out Of The Way**: No HUD of its own and no performance penalty during normal play — the only things it shows are the optional title panel you open yourself with `/titles` and, on a TheRavensCall 1.8.0+ server, the title line under other players' names.
 - **Safe Everywhere**: Connects safely to vanilla servers or servers without `TheRavensCall` with silent no-op dispatch.
 
 ---
@@ -68,6 +69,11 @@ FullSyncIntervalSeconds = 300
 # Setting type: KeyCode
 # Default value: None
 TitlePanelKey = None
+
+## Show other players' active TheRavensCall titles on a line under their name on their nameplate. Needs TheRavensCall 1.8.0 or newer on the server. Off = plain names.
+# Setting type: Boolean
+# Default value: true
+ShowNameplateTitles = true
 ```
 
 ---
@@ -75,8 +81,8 @@ TitlePanelKey = None
 ## 🏷️ Picking your title
 
 On a server running **TheRavensCall 1.7.0+**, choose which of your earned titles the server shows with your name
-in its Discord narration, Chronicle log and web dashboard — nothing changes on your in-game nameplate. Two ways
-to do it:
+in its Discord narration, Chronicle log and web dashboard — and, on **TheRavensCall 1.8.0+**, under your name on
+other players' screens (see "Titles on nameplates" below). Two ways to do it:
 
 - **The title panel**: `/titles` (chat) or `titles` (F5 console) opens a small window listing everything you've
   earned. Click one to set it, "No title" to clear it, Esc or Close to leave. It asks the server on open and
@@ -95,6 +101,25 @@ names both possible causes — everything else in this mod keeps working normall
 
 **Vendored, and not ours:** the panel's gilt frame is Wubarrk's VikingOS shared source (`Libs/SharedUI/GiltFrameTheme.cs`,
 MIT), compiled in unchanged.
+
+---
+
+## 📛 Titles on nameplates
+
+On a server running **TheRavensCall 1.8.0+**, every other player's active title shows on its own line directly
+under their name, on the nameplate the game draws over them (when they're close by; the game hides it while they
+crouch). The line is smaller than the name and a cool blue-grey. It changes as soon as their active title does (they
+pick one, clear it, or earn their first), and when you join you get every online player's current title at once.
+
+- **You never see your own nameplate**: the game draws none over your own character. To check yours, ask a second
+  player running this mod to look at you.
+- **The looking player needs WhereTheCrowFlies 1.3.0+.** The line is drawn by the viewer's game, so players without
+  it see plain names. On an older TheRavensCall, or none, nothing is sent and every name stays plain.
+- **Ragnarok's Wrath**: its world title, in gold, already sits under the nameplate. Both show: this mod's line
+  directly under the name, Ragnarok's Wrath's line under it.
+- **Plain names instead**: set `ShowNameplateTitles = false` in the config above.
+- Titles are matched by character name, the way TheRavensCall keeps them: two characters with the same name show
+  the same title.
 
 ---
 

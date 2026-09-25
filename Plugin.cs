@@ -18,6 +18,7 @@ namespace WhereTheCrowFlies
         public static ConfigEntry<bool> EnableReporting;
         public static ConfigEntry<float> FullSyncIntervalSeconds;
         public static ConfigEntry<KeyCode> TitlePanelKey;
+        public static ConfigEntry<bool> ShowNameplateTitles;
 
         private readonly Harmony _harmony = new Harmony(PluginGUID);
 
@@ -47,6 +48,14 @@ namespace WhereTheCrowFlies
                 KeyCode.None,
                 "Key that opens the title panel (the same panel the /titles command opens). None = command only. " +
                 "Read through the game's own input layer (ZInput), so it works with Valheim 1.0's input system."
+            );
+
+            ShowNameplateTitles = Config.Bind(
+                "General",
+                "ShowNameplateTitles",
+                true,
+                "Show other players' active TheRavensCall titles on a line under their name on their nameplate. " +
+                "Needs TheRavensCall 1.8.0 or newer on the server. Off = plain names."
             );
 
             try

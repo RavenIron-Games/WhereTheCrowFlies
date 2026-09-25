@@ -4,6 +4,21 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
 ## [1.3.0] - TBD
 
+### Added
+- **Titles on nameplates.** On a server running **TheRavensCall 1.8.0+**, the nameplate the game draws over another
+  player (close by, and not while they crouch) gets a second line directly under their name: their active title,
+  smaller than the name and in a cool blue-grey. It changes as soon as their active title does (they pick one, clear
+  it, or earn their first), and when you join you get every online player's current title at once. You never see
+  your own nameplate (the game draws none over your own character); other players see yours. The line is drawn by
+  the looking player's game: players without WhereTheCrowFlies 1.3.0+ see plain names.
+- **`ShowNameplateTitles` config** (section `General`, default `true`): `false` shows plain names.
+- **Works alongside Ragnarok's Wrath.** Ragnarok's Wrath already adds its own world title, in gold, under the
+  nameplate. Both show: this mod's line directly under the name, Ragnarok's Wrath's line under it.
+- **`RavensCall_TitleSync_V1`**: a new server → everybody routed RPC that this mod receives (schema 1: a count, then a
+  player name and that player's active title per entry, `""` = no title). It is accepted only from the server, and
+  every title is cleaned before it reaches a nameplate: no rich-text tags, no `$` localisation keys, no control
+  characters or backslashes, 64 characters at most. See `HANDOFF.md` §2.3b.
+
 ### Fixed
 - **Damage in multiplayer was mostly missing, and PvP damage was always zero.** A hit is worked out on the
   attacker's machine and applied on the machine that owns the target, but the damage report only counted a hit
@@ -28,11 +43,16 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   path of its debug-symbols file, including the Windows user folder it was built in. The build now maps its source
   folder to a neutral `/_/` path, so the DLL names no folder on the build machine, and a build of the same commit
   comes out byte-identical in any clone of the GitHub repository (Windows, Git's default line endings, same .NET SDK).
+- **The `title` command's help text** no longer says your title never reaches the in-game nameplate: on
+  TheRavensCall 1.8.0+ it shows under your name for other players running this mod.
 
 ### Compatibility
-- No wire change: the same reports with the same fields, so no server update is needed. Pairs with the same
-  servers as 1.2.0: **TheRavensCall 1.7.0+** for `/title` and the title panel, **TheRavensCall 1.2.2+** for
-  everything else.
+- Nothing this mod sends has changed: the same reports with the same fields, so no server update is needed for them.
+  The one wire addition is the `RavensCall_TitleSync_V1` receiver above. Pairs with **TheRavensCall 1.8.0+** for
+  titles on nameplates, **TheRavensCall 1.7.0+** for `/title` and the title panel, **TheRavensCall 1.2.2+** for
+  everything else. An older TheRavensCall never sends the new packet, so nameplates simply stay plain.
+- Titles are matched by character name, the way TheRavensCall keeps them: two characters with the same name show
+  the same title.
 - Damage dealt and taken will be higher than before in group play: that is the damage that was missing. Damage
   taken for the same fight will be lower than before, because it is now counted after armor and blocking.
 

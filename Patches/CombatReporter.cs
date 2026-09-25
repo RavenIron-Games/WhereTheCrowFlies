@@ -825,7 +825,7 @@ namespace WhereTheCrowFlies.Patches
                     else
                     {
                         new Terminal.ConsoleCommand("title",
-                            "Pick which of your earned titles the server shows with your name in its Discord narration, Chronicle log and web dashboard (TheRavensCall 1.7.0+); nothing changes on your in-game nameplate: title (list yours) | title <name> | title clear",
+                            "Pick which of your earned titles the server shows with your name in its Discord narration, Chronicle log and web dashboard (TheRavensCall 1.7.0+), and under your name on other players' screens (TheRavensCall 1.8.0+, for players running WhereTheCrowFlies 1.3.0+): title (list yours) | title <name> | title clear",
                             TitlePicker.HandleCommand,
                             optionsFetcher: TitlePicker.GetTabOptions,
                             alwaysRefreshTabOptions: true);
