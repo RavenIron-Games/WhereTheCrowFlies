@@ -691,6 +691,13 @@ namespace WhereTheCrowFlies.Patches
             {
                 _fullSyncTimer -= fullSyncInterval;
                 if (_fullSyncTimer >= fullSyncInterval) _fullSyncTimer = 0f;
+                // EnableReporting covers player stats too (its description),
+                // and the spawn backfill already checks it; this clock sent
+                // the snapshot regardless until 1.3.0. On a listen host that
+                // snapshot also tells TheRavensCall 1.8.0 this crow reports
+                // the host's damage taken, which it never would with
+                // reporting off.
+                if (!Plugin.EnableReporting.Value) return;
                 // Pending deltas go out BEFORE the absolute snapshot. The
                 // snapshot already contains everything accumulated so far; a
                 // delta sent after it would be added on top by the server and

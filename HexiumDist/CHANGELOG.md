@@ -47,6 +47,9 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   among them) already went out on a world you host through 1.2.x, and TheRavensCall up to 1.7.x dropped it;
   TheRavensCall 1.8.0 counts it, taking the damage you deal from its own hook and the damage you take from this
   mod, so each hit counts once.
+- **`EnableReporting = false` still sent your stats and skills.** The full stat and skill snapshot went out on its
+  own clock (`FullSyncIntervalSeconds`) whatever `EnableReporting` said, although the setting covers player stats.
+  With it off, this mod now sends nothing but your own `/title` and title-panel requests.
 
 ### Changed
 - **Nothing is sent from a dedicated server.** Through 1.2.x this mod's connection check passed on any server, a
