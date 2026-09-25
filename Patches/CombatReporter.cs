@@ -96,30 +96,45 @@ namespace WhereTheCrowFlies.Patches
         // The one "may this report go out" gate, for every sender below and
         // for TitlePicker.Send. A server process reads Connected no matter
         // what (GetConnectionStatus returns Connected whenever IsServer(),
-        // decomp/ZNet.cs:2954-2958), so the server case is decided on its
-        // own: a listen host reports its own player, a dedicated server
-        // never reports (it has no player of its own). A pure client reports
+        // decomp/ZNet.cs:2954-2958), so through 1.2.x this check let any
+        // server send, a dedicated one included. Since 1.3.0 the server case
+        // is decided on its own: a game that hosts the world (a listen
+        // server, or single player) reports, and a dedicated server never
+        // does (IsDedicated() is false only in the game client's build,
+        // decomp/ZNet.cs:2445-2448 is that build). A pure client reports
         // once it is connected, as before.
+        //
+        // The host needs no character of its own here. Between a death and
+        // the respawn it has none (Game._RequestRespawn destroys it,
+        // decomp/Game.cs:655-664, and UpdateRespawn spawns the next one,
+        // :760-770), and a damage batch flushed in that window must still go
+        // out: FlushCombatEntry clears the entry whether it was sent or not.
+        // TheRavensCall 1.8.0+ takes such a report as the host's through the
+        // host's open session, and refuses it without a word when there is
+        // none. The senders that read the local player check for it
+        // themselves, and /title asks for it (IsListenHost, TitlePicker.Send).
         internal static bool IsConnected()
         {
             if (ZNet.instance == null || ZRoutedRpc.instance == null) return false;
-            if (ZNet.instance.IsServer()) return IsListenHost();
+            if (ZNet.instance.IsServer()) return !ZNet.instance.IsDedicated();
             return ZNet.GetConnectionStatus() == ZNet.ConnectionStatus.Connected;
         }
 
         // A listen host (1.3.0): the game running the world with a player of
-        // its own. A single-player world is the same case with nobody else
-        // on. Its reports use the same routed RPCs with the no-target
-        // overload, which on a server targets the routed instance's own id
-        // (GetServerPeerID returns m_id, decomp/ZRoutedRpc.cs:107-112) and
-        // so runs the handler in this process and sends nothing on the
-        // network (:130-137). TheRavensCall 1.8.0+ installed on the host
-        // takes such a report as the host's own. Without TheRavensCall
-        // there is no handler, and HandleRoutedRPC drops the call without a
-        // word (:189-197), so nothing breaks. A dedicated server fails both
-        // of the last two checks: IsDedicated() is false only in the game
-        // client's build (decomp/ZNet.cs:2445-2448 is that build), and a
-        // headless server never spawns a local player.
+        // its own in it right now. A single-player world is the same case
+        // with nobody else on. Its reports use the same routed RPCs with the
+        // no-target overload, which on a server targets the routed
+        // instance's own id (GetServerPeerID returns m_id,
+        // decomp/ZRoutedRpc.cs:107-112) and so runs the handler in this
+        // process and sends nothing on the network (:130-137).
+        // TheRavensCall 1.8.0+ installed on the host takes such a report as
+        // the host's own. Without TheRavensCall there is no handler, and
+        // HandleRoutedRPC drops the call without a word (:189-197), so
+        // nothing breaks. /title needs the character (its request carries
+        // the character's name), so TitlePicker.Send asks for this; the
+        // telemetry gate above does not. A dedicated server fails both of
+        // the last two checks: see IsConnected, and a headless server never
+        // spawns a local player.
         internal static bool IsListenHost()
         {
             return ZNet.instance != null &&
@@ -956,12 +971,26 @@ namespace WhereTheCrowFlies.Patches
 
             if (!TelemetrySender.IsConnected())
             {
-                // Not in a world yet (or the host's character is not spawned
-                // right now). A world this game hosts itself (a listen server,
-                // or single player) sends like any client since 1.3.0: the
-                // request is handled in this same process, and TheRavensCall
-                // 1.8.0+ installed here answers it (see TelemetrySender.IsListenHost).
+                // Not in a world yet (or a dedicated server). A world this
+                // game hosts itself (a listen server, or single player) sends
+                // like any client since 1.3.0: the request is handled in this
+                // same process, and TheRavensCall 1.8.0+ installed here
+                // answers it (see TelemetrySender.IsListenHost).
                 const string msg = "Titles are kept by the server; join a server running TheRavensCall 1.7.0 or newer, or host your world with TheRavensCall 1.8.0 or newer installed.";
+                Print(context, msg);
+                if (TitlePanel.IsOpen) TitlePanel.OnLocal(msg);
+                return false;
+            }
+
+            if (ZNet.instance.IsServer() && !TelemetrySender.IsListenHost())
+            {
+                // This game hosts the world, but its character is not in it
+                // right now (between a death and the respawn, or still
+                // loading in). The request carries the character's name, so
+                // there is nothing to send, and the line above would tell the
+                // host to set up what is already running. A pure client is
+                // left as before.
+                const string msg = "Your character is not in the world right now; try again once you have respawned.";
                 Print(context, msg);
                 if (TitlePanel.IsOpen) TitlePanel.OnLocal(msg);
                 return false;
@@ -1263,7 +1292,10 @@ namespace WhereTheCrowFlies.Patches
     //
     // On a listen host (1.3.0) both sides count every hit of the host
     // player's own, the same as for any client (see Patch_RPCDamageSender
-    // for why nothing is left out there).
+    // for why nothing is left out there). TheRavensCall 1.8.0 ignores the
+    // damage dealt in the host's batches: it credits the host's damage
+    // dealt from its own Character.Damage patch, which sees every hit the
+    // host deals.
     [HarmonyPatch(typeof(Character), nameof(Character.Damage))]
     internal static class Patch_Damage
     {
@@ -1313,12 +1345,15 @@ namespace WhereTheCrowFlies.Patches
     // sender == ZNet.GetUID() (Character.Damage -> ZNetView.InvokeRPC to the
     // owner, handled locally: decomp/Character.cs:2232-2239,
     // ZNetView.cs:331-334, ZRoutedRpc.cs:120-133), but TheRavensCall 1.8.0
-    // does not credit the host's own player from its Character.Damage patch
-    // once the host's WhereTheCrowFlies has reported in that world session
-    // (Saga.cs Patch_Damage): the host's damage dealt and taken then comes
-    // from this mod's batches alone, every hit counted as on any client.
-    // Leaving the host's own hits out here too would lose them.
-    // Without a report from this mod the patch stays the host's only source.
+    // splits the host's damage by direction (Saga.cs Patch_Damage). The
+    // damage the host DEALS it always credits from its own Character.Damage
+    // patch, and ignores in these batches. The damage the host TAKES it
+    // takes from these batches once the host's WhereTheCrowFlies has sent
+    // telemetry in that world session, and its patch then leaves the host
+    // out as a victim, so every hit the host takes must be counted here, as
+    // on any client; leaving the host's own hits out would lose them. Until
+    // that first telemetry report (and with EnableReporting off, which sends
+    // none) the patch stays the host's only source both ways.
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Patch_RPCDamageSender
     {

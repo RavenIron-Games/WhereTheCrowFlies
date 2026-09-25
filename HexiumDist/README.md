@@ -20,7 +20,7 @@
 
 In Valheim's peer-to-peer multiplayer simulation model, combat calculations, creature deaths, damage, parries, building, crafting, foraging, and fishing are simulated locally on the client that owns the local zone or character. **WhereTheCrowFlies** acts as the client-side scout—observing all gameplay events with zero client lag and securely reporting them back to dedicated servers running **TheRavensCall** via routed RPC.
 
-**Hosting the world yourself?** On a listen server, or a single-player world, the game you play in is also the server. Install **TheRavensCall 1.8.0+** in that same game and your own play counts too, and `/title` works for you as the host. Without TheRavensCall there, nothing is recorded for you and nothing breaks.
+**Hosting the world yourself?** On a listen server, or a single-player world, the game you play in is also the server. Install **TheRavensCall 1.8.0+** in that same game and your own play counts too, and `/title` works for you as the host. TheRavensCall then counts the damage you deal with its own hook and takes the damage you take from this mod, so each hit counts once. Without TheRavensCall there, nothing is recorded for you and nothing breaks.
 
 ---
 
@@ -103,6 +103,7 @@ names both possible causes — everything else in this mod keeps working normall
 
 On a world you host yourself (a listen server, or single player), both work too when your game also runs
 **TheRavensCall 1.8.0+**; without it, nothing answers and the hint after a few seconds says what the host needs.
+While your character is not in the world (after a death, until the respawn), `/title` says so instead of asking.
 
 **Vendored, and not ours:** the panel's gilt frame is Wubarrk's VikingOS shared source (`Libs/SharedUI/GiltFrameTheme.cs`,
 MIT), compiled in unchanged.

@@ -38,15 +38,19 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - **A boss summon could be counted more than once.** Pressing the altar again while the boss was still on its way
   (when another player's game was running the altar's area), or a summon that failed for lack of room, each
   counted as a summon. A summon is now counted once, when the boss spawn has really started.
-- **The player hosting the world was left out.** On a world you host yourself (a listen server, or a single-player
-  world with TheRavensCall installed), `/title` and the title panel only said to join a server, and TheRavensCall
-  never counted what this mod reported about you. With **TheRavensCall 1.8.0+** installed on the hosting game it now
-  does, as for any other player (damage, blocks, building, crafting, harvesting, food, rituals, stats and skills
-  among them), and `/title` and the title panel work for you. Without TheRavensCall on the host nothing answers,
-  and after 5 seconds the hint says what the host needs. A dedicated server is unchanged: this mod never reports
-  from one.
+- **`/title` and the title panel did not work for the player hosting the world.** On a world you host yourself (a
+  listen server, or a single-player world with TheRavensCall installed), they only said to join a server. With
+  **TheRavensCall 1.8.0+** installed on the hosting game they now work for you as for any other player; while your
+  character is not in the world (after a death, until the respawn), `/title` says so instead of asking. Without
+  TheRavensCall on the host nothing answers, and after 5 seconds the hint says what the host needs. The rest of
+  what this mod reports about you (damage, blocks, building, crafting, harvesting, food, rituals, stats and skills
+  among them) already went out on a world you host through 1.2.x, and TheRavensCall up to 1.7.x dropped it;
+  TheRavensCall 1.8.0 counts it, taking the damage you deal from its own hook and the damage you take from this
+  mod, so each hit counts once.
 
 ### Changed
+- **Nothing is sent from a dedicated server.** Through 1.2.x this mod's connection check passed on any server, a
+  dedicated one included; installed on a dedicated server, it now stays silent there.
 - **The DLL no longer carries the build machine's folder path.** Every build through 1.2.0 embedded the absolute
   path of its debug-symbols file, including the Windows user folder it was built in. The build now maps its source
   folder to a neutral `/_/` path, so the DLL names no folder on the build machine, and a build of the same commit
