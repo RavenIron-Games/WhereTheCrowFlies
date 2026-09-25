@@ -376,9 +376,11 @@ rule, §2.3). On a listen host (`ZNet.instance.IsServer()`) the packet is the ho
 `ZDOMan.GetSessionID()` (decomp/ZNet.cs:396), the same value `ZNet.GetUID()` returns (decomp/ZNet.cs:2163-2165), so
 there `sender == ZNet.GetUID()` is accepted. Anything else is dropped before parsing. The whole packet is read before
 the cache changes, so a truncated one changes nothing. Every title goes through `NameplateTitles.Clean` first: control
-characters, `<` and `>` (TextMeshPro rich text), `$` (`Localization.Localize` reads `$word` as a key) and `\`
-(TextMeshPro turns `\n`, `\uXXXX` and the like into the characters themselves) are dropped, then the title is
-trimmed and capped at 64 characters. The cache holds at most 1024 names; past that only names already in it update.
+characters and the Unicode line/paragraph separators (U+2028/U+2029), `<`, `>`, `$` and `\` are dropped (the plate's
+TextMeshProUGUI breaks a line on a newline and on both separators, and `char.IsControl` misses the separators; `<` and
+`>` are TextMeshPro rich text; `Localization.Localize` reads `$word` as a key; TextMeshPro turns `\n`, `\uXXXX` and the
+like into the characters themselves), then the title is trimmed and capped at 64 characters. The cache holds at most
+1024 names; past that only names already in it update.
 
 **Render.** A `Player.GetHoverName` postfix (`Patch_NameplateTitle`) appends
 `"\n<size=70%><color=#a8c0d8>" + title + "</color></size>"` when `ShowNameplateTitles` is on and the cache has the
@@ -390,14 +392,18 @@ Humanoid's `$msg_cantuseon` message (using an item on another player), as Ragnar
 
 **Ragnarok's Wrath.** RW appends its own world-sim title to the same method (a default-priority postfix, Harmony id
 `com.raveniron.ragnarokswrath`, gold `#c9b458`). `[HarmonyBefore("com.raveniron.ragnarokswrath")]` makes ours run
-first, so the plate reads name, our title, RW's title. HarmonyX sorts postfixes with the same `PatchSorter` as every
-other patch kind, where a `HarmonyBefore` edge wins over priority, and emits them in that order
+first; it is set up so that the plate reads name, our title, RW's title. HarmonyX sorts postfixes with the same
+`PatchSorter` as every other patch kind, where a `HarmonyBefore` edge wins over priority, and emits them in that order
 (`HarmonyManipulator.WritePostfixes`; checked in the HarmonyX 2.9.0 build this project compiles against). No data
 passes between the two mods; they share only this seam.
 
 **Known limit.** Keyed by name, because TheRavensCall keys its records by name and its join hook runs before the
 character exists. A player who joins under a name that TheRavensCall has bound to another account ("untrusted" in
-1.8.0) shows that name's title too; the plate already shows the name itself, so the title adds nothing new.
+1.8.0) can show that name's title too (when the player who owns the name is or was online in the same session); the
+plate already shows the name itself, so the title adds nothing new.
+
+Not run in a game yet: it needs a TheRavensCall 1.8.0 server and two players on 1.3.0 (you never see your own plate),
+plus Ragnarok's Wrath to see the two-line order.
 
 ---
 

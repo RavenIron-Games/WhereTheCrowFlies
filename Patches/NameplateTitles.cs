@@ -129,6 +129,9 @@ namespace WhereTheCrowFlies.Patches
         // TextMeshPro rich text, and Localization.Localize runs over all of
         // it every frame (decomp/EnemyHud.cs:200), so these are dropped:
         //  - control characters: a newline or tab would break the plate apart;
+        //  - U+2028 and U+2029 (line and paragraph separator): the plate's
+        //    TextMeshProUGUI breaks a line on them too (GenerateTextMesh),
+        //    and char.IsControl misses them (it only matches category Cc);
         //  - '<' and '>': TextMeshPro would read a tag, or print a broken one;
         //  - '$': Localize reads "$word" as a translation key and prints
         //    "[word]" when there is none (Localization.FindNextWord and
@@ -145,7 +148,7 @@ namespace WhereTheCrowFlies.Patches
             var sb = new StringBuilder(title.Length);
             foreach (char c in title)
             {
-                if (char.IsControl(c) || c == '<' || c == '>' || c == '$' || c == '\\') continue;
+                if (char.IsControl(c) || c == '\u2028' || c == '\u2029' || c == '<' || c == '>' || c == '$' || c == '\\') continue;
                 sb.Append(c);
             }
 

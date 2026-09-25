@@ -55,7 +55,8 @@ namespace WhereTheCrowFlies
                 "ShowNameplateTitles",
                 true,
                 "Show other players' active TheRavensCall titles on a line under their name on their nameplate. " +
-                "Needs TheRavensCall 1.8.0 or newer on the server. Off = plain names."
+                "Needs TheRavensCall 1.8.0 or newer on the server. Off = no TheRavensCall title line " +
+                "(other mods' lines, like Ragnarok's Wrath's, are not affected)."
             );
 
             try

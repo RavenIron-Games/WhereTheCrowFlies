@@ -10,10 +10,11 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
   smaller than the name and in a cool blue-grey. It changes as soon as their active title does (they pick one, clear
   it, or earn their first), and when you join you get every online player's current title at once. You never see
   your own nameplate (the game draws none over your own character); other players see yours. The line is drawn by
-  the looking player's game: players without WhereTheCrowFlies 1.3.0+ see plain names.
-- **`ShowNameplateTitles` config** (section `General`, default `true`): `false` shows plain names.
+  the looking player's game: players without WhereTheCrowFlies 1.3.0+ see no TheRavensCall title line.
+- **`ShowNameplateTitles` config** (section `General`, default `true`): `false` hides the TheRavensCall title line.
 - **Works alongside Ragnarok's Wrath.** Ragnarok's Wrath already adds its own world title, in gold, under the
-  nameplate. Both show: this mod's line directly under the name, Ragnarok's Wrath's line under it.
+  nameplate. It is set up so that both show, this mod's line directly under the name and Ragnarok's Wrath's line
+  under it.
 - **`RavensCall_TitleSync_V1`**: a new server → everybody routed RPC that this mod receives (schema 1: a count, then a
   player name and that player's active title per entry, `""` = no title). It is accepted only from the server, and
   every title is cleaned before it reaches a nameplate: no rich-text tags, no `$` localisation keys, no control
@@ -50,7 +51,7 @@ All notable changes to **WhereTheCrowFlies** will be documented in this file.
 - Nothing this mod sends has changed: the same reports with the same fields, so no server update is needed for them.
   The one wire addition is the `RavensCall_TitleSync_V1` receiver above. Pairs with **TheRavensCall 1.8.0+** for
   titles on nameplates, **TheRavensCall 1.7.0+** for `/title` and the title panel, **TheRavensCall 1.2.2+** for
-  everything else. An older TheRavensCall never sends the new packet, so nameplates simply stay plain.
+  everything else. An older TheRavensCall never sends the new packet, so no TheRavensCall title line shows.
 - Titles are matched by character name, the way TheRavensCall keeps them: two characters with the same name show
   the same title.
 - Damage dealt and taken will be higher than before in group play: that is the damage that was missing. Damage

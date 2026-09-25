@@ -70,7 +70,7 @@ FullSyncIntervalSeconds = 300
 # Default value: None
 TitlePanelKey = None
 
-## Show other players' active TheRavensCall titles on a line under their name on their nameplate. Needs TheRavensCall 1.8.0 or newer on the server. Off = plain names.
+## Show other players' active TheRavensCall titles on a line under their name on their nameplate. Needs TheRavensCall 1.8.0 or newer on the server. Off = no TheRavensCall title line (other mods' lines, like Ragnarok's Wrath's, are not affected).
 # Setting type: Boolean
 # Default value: true
 ShowNameplateTitles = true
@@ -114,10 +114,11 @@ pick one, clear it, or earn their first), and when you join you get every online
 - **You never see your own nameplate**: the game draws none over your own character. To check yours, ask a second
   player running this mod to look at you.
 - **The looking player needs WhereTheCrowFlies 1.3.0+.** The line is drawn by the viewer's game, so players without
-  it see plain names. On an older TheRavensCall, or none, nothing is sent and every name stays plain.
-- **Ragnarok's Wrath**: its world title, in gold, already sits under the nameplate. Both show: this mod's line
-  directly under the name, Ragnarok's Wrath's line under it.
-- **Plain names instead**: set `ShowNameplateTitles = false` in the config above.
+  it see no TheRavensCall title line. On an older TheRavensCall, or none, nothing is sent and no TheRavensCall
+  title line shows.
+- **Ragnarok's Wrath**: its world title, in gold, already sits under the nameplate. It is set up so that both show,
+  this mod's line directly under the name and Ragnarok's Wrath's line under it.
+- **No title line instead**: set `ShowNameplateTitles = false` in the config above.
 - Titles are matched by character name, the way TheRavensCall keeps them: two characters with the same name show
   the same title.
 
