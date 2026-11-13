@@ -9,7 +9,7 @@ So the chain is: **your RPC field → TheRavensCall's JSON key → an answer a m
 reads.** A field renamed at this end silently zeroes a feature two programs
 away, and nothing in between will error.
 
-See `/home/rohan/WubarrkCODING/TheRavensCall/BARRKBOT_CONTRACT.md` for the file
+See `/home/rohan/WubarrkCODING/ValheimMods/TheRavensCall/BARRKBOT_CONTRACT.md` for the file
 side of the same contract, and the 20 Aug incident that prompted both.
 
 ## What BarrkBOT does with what you send

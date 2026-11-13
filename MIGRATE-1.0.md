@@ -95,7 +95,7 @@
 >
 > **Deviations / notes.** The repo has no fold script; the zip was made with the shared deterministic packer
 > (same five entries as 1.1.0: manifest, README, CHANGELOG, icon, `plugins/WhereTheCrowFlies.dll`). A byte-identical
-> copy of this project sits in `PAUSED/WhereTheCrowFlies/` from before it was un-paused; it is now stale.
+> copy of this project sits in `PAUSED/WhereTheCrowFlies-OLD-1.1.0/` from before it was un-paused; it is now stale.
 >
 > **Open.** Real client playtest of a stat snapshot against TheRavensCall 1.2.2 (expect 205 `vanilla_stats` keys
 > in `BarrkBOT_data1.json`, the new ones named after the 1.0 enum entries).

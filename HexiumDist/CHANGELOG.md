@@ -2,6 +2,20 @@
 
 All notable changes to **WhereTheCrowFlies** will be documented in this file.
 
+## [1.2.1] - 2026-11-01
+
+### Changed
+- **Rebuilt and checked against Valheim 1.0.21 (network version 41).** Valheim 1.0.21 replaced
+  `PlayerProfile.GetStat(stat)` with `GetStat(stat, difficulty)`. This mod never called it: the stat snapshot
+  reads the profile's unconditional counter set (`m_playerStats[0]`) directly and the live stat deltas hook
+  `PlayerProfile.IncrementStat`, both unchanged in 1.0.21, and the counter list is the same 205 stats as before.
+  The other patched game methods (crafting, building, kills, deaths, fishing, blocking, the title picker's
+  text-input check) were re-read against 1.0.21 and still bind and behave the same.
+- **Website link** is now <https://ravenirongames.com/>.
+- **BepInEx dependency** is now BepInExPack_Valheim 5.4.2360.
+- The DLL no longer carries an absolute build path that included the build machine's user name (DLLs already
+  published are unchanged).
+
 ## [1.2.0] - 2026-09-23
 
 ### Added
