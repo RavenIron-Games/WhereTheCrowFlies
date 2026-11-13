@@ -1,9 +1,9 @@
 {
   "name": "WhereTheCrowFlies",
-  "version_number": "1.2.0",
-  "website_url": "https://ravenirongames.com",
+  "version_number": "1.2.1",
+  "website_url": "https://ravenirongames.com/",
   "description": "Client companion mod for TheRavensCall. Witnesses and reports combat events, kills, deaths, damage, blocks, parries, fishing, crafting, building, foraging, rituals, and player stats to servers running TheRavensCall.",
   "dependencies": [
-    "denikson-BepInExPack_Valheim-5.4.2350"
+    "denikson-BepInExPack_Valheim-5.4.2360"
   ]
 }
